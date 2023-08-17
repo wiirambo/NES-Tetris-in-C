@@ -382,14 +382,11 @@ private:
 		}
 		// Load the cartridge
 		//cart = std::make_shared<Cartridge>("../nestest.nes");
-		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Tetris (USA).nes", &nes);
-		cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/7DigitScore.nes", &nes);
+		cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Tetris (USA).nes", &nes);
+		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/7DigitScore.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/6to7DigitScore.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/speedhack1.1.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/palmode.nes");
-		//cart = std::make_shared<Cartridge>("speedhack1.1.nes");
-		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Chip 'n Dale - Rescue Rangers (USA).nes");
-		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Airwolf (USA).nes");
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Super Mario Bros. (World).nes");
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Super Mario Bros. + Tetris + Nintendo World Cup (Europe).nes");
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Tetris (Europe).nes");
@@ -423,7 +420,7 @@ private:
 		// call which returns a sound sample on demand
 		pInstance = this;
 
-		if (speedFactor == 1) {
+		if (speedFactor == 1) { //no sound when in speedup mode
 			nes.SetSampleFrequency(44100);
 			olc::SOUND::InitialiseAudio(44100, 1, 8, 512);
 			olc::SOUND::SetUserSynthFunction(SoundOut);
