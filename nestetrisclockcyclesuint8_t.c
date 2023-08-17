@@ -18,7 +18,7 @@ typedef enum {
     CRASHFIX
 } Modifications;
 
-Modifications modification = SEVENDIGITS;
+Modifications modification = CRASHFIX;
 
 uint8_t* tmp1;
 uint8_t* tmp2;
