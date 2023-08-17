@@ -1,0 +1,16 @@
+class Bus;
+class Cartidge;
+class Mapper;
+class Mapper_000;
+class Mapper_001;
+class Mapper_002;
+class Mapper_003;
+class Mapper_004;
+class Mapper_066;
+class olc2A03;
+class olc2C02;
+class olc6502;
+class PixelGameEngine;
+class PGEX;
+class SOUND;
+class olcNES;
