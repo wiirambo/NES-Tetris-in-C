@@ -12,7 +12,7 @@
 
 typedef enum {
     UNMODIFIED,
-    SEVENDIGITS, //score display does not work correctly
+    SEVENDIGITS,
     NOMAXOUTCODE,
     ENEOOGEZ,
     CRASHFIX
@@ -641,6 +641,78 @@ void setBaseAddressRAM() {
     highScoreScoresB = addressSpace + 0x073C;
     highScoreLevels = addressSpace + 0x0748;
     initMagic = addressSpace + 0x0750;
+}
+
+int updateAudioWaitForNmiAndResetOamStaging() {
+    int clockcycles = 6;
+    //clockcycles += updateAudio_jmp();
+    *verticalBlankingInterval = 0;
+
+    clockcycles = 18; //counting after NMI
+    *accumulator = 0;
+    *registerX = 0;
+    *registerY = 0;
+    clockcycles += memset_page();
+    return clockcycles;
+}
+
+int updateAudio_jmp() {
+    int clockcycles = 3;//there is an extra jmp at the beginning
+    return clockcycles + 6;
+}
+
+int stopSoundEffectSlot0() {
+    *soundEffectSlot0Playing = 0;
+    *noiseVolume = 0x10;
+    return 18;
+}
+
+
+int initAudioAndMarkInited() {
+    printf("initAudioAndMarkInited\r\n");
+    int clockcycles = 11;
+    (*audioInitialized)++;
+    clockcycles += muteAudio();
+    musicPauseSoundEffectLengthCounter = 0;
+    return clockcycles + 6;
+}
+
+
+
+
+
+
+int computeSoundEffMethod() {
+    int clockcycles = 12;
+    *currentAudioSlot = *accumulator;
+    uint8_t temp = *accumulator;
+    *AUDIOTMP2 = 0xE0;
+    *registerY = 0;
+    do {
+        clockcycles += 5;
+        (*currentAudioSlot)--;
+        if (*currentAudioSlot == 0) {
+            clockcycles += 18;
+            *AUDIOTMP3 = addressSpace[*((uint16_t*)AUDIOTMP1) + *registerY];
+            (*registerY)++;
+            *AUDIOTMP4 = addressSpace[*((uint16_t*)AUDIOTMP1) + *registerY];
+            *accumulator = temp;
+            *currentAudioSlot = temp;
+
+            //printf("Address: %02x %02x\r\n", *AUDIOTMP3, *AUDIOTMP4);
+
+            return clockcycles + 12;
+        }
+        *registerY += 2;
+        clockcycles += 12;
+    } while (*registerY != 0x22);
+    clockcycles += 15;
+    *AUDIOTMP3 = 0x91;
+    *AUDIOTMP4 = 0xE0;
+
+    *accumulator = temp;
+    *currentAudioSlot = temp;
+    return clockcycles + 6;
 }
 
 int playState_player2ControlsActiveTetrimino() {
@@ -2806,9 +2878,9 @@ int calculate_score() {
         }
         clockcycles += 8;
     }
-    if (clockcycles > 10000) { //Hackfix Crashfix
+    /*if (clockcycles > 10000) { //Hackfix Crashfix
         return 10000;
-    }
+    }*/
     return clockcycles + 2;
 }
 

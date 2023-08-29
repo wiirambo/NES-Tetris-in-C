@@ -73,6 +73,10 @@ int switch_s_plus_2a();
 int copyOamStagingToOam();
 int gameModeState_checkForResetKeyCombo();
 int playState_player2ControlsActiveTetrimino();
+int updateAudio_jmp();
+int computeSoundEffMethod();
+int initAudioAndMarkInited();
+int stopSoundEffectSlot0();
 
 int NMI();
 

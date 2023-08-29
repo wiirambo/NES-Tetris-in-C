@@ -108,10 +108,9 @@ class olc6502
 public:
 	olc6502();
 	~olc6502();
-
 public:
 
-	bool skipNMI = false;
+	bool disableTiming = true;
 	// CPU Core registers, exposed as public here for ease of access from external
 	// examinors. This is all the 6502 has.
 	uint8_t  a      = 0x00;		// Accumulator Register
@@ -121,6 +120,9 @@ public:
 	uint16_t pc     = 0x0000;	// Program Counter
 	uint8_t  status = 0x00;		// Status Register
 	
+	void skipPastNMI();
+	int testcounter = 0;
+
 	// External event functions. In hardware these represent pins that are asserted
 	// to produce a change in state.
 	void reset();	// Reset Interrupt - Forces CPU into known state
@@ -158,7 +160,6 @@ public:
 
 private:
 	// Convenience functions to access status register
-	int skipPastNMI();
 	uint8_t GetFlag(FLAGS6502 f);
 	void    SetFlag(FLAGS6502 f, bool v);
 	void unstack(); //unstacking like rts instruction

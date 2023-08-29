@@ -1104,12 +1104,24 @@ uint8_t olc6502::JMP()
 		case 0xA609:cycles += kidIcarus();
 					unstack();
 					break;
+		case 0xE1E5:cycles += initAudioAndMarkInited(); //unused?
+					unstack();
+				std::cout << "jmp" << std::endl;
+					break;
+		case 0xE2E9:cycles += stopSoundEffectSlot0(); //never used?
+					unstack();
+					break;
 		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
 					unstack();
 					setFlags();
 					break;
 		default: pc = addr_abs;
 		}
+
+		if (disableTiming == true) {
+			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
+		}
+		
 		return 0;
 	}else{
 		pc = addr_abs;
@@ -1212,8 +1224,14 @@ uint8_t olc6502::JSR()
 					break;
 		case 0xE003:cycles += updateAudio2();
 					break;
+		case 0xE072:cycles += computeSoundEffMethod();
+					setFlags();
+					break;
 		case 0xE0B5:cycles += advanceAudioSlotFrame();
 					setFlags();
+					break;
+		case 0xE1E5:cycles += initAudioAndMarkInited();//unused?
+					std::cout << "jsr" << std::endl;
 					break;
 		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
 					setFlags();
@@ -1233,6 +1251,9 @@ uint8_t olc6502::JSR()
 					write(0x0100 + stkp, pc & 0x00FF);
 					stkp--;
 					pc = addr_abs;
+		}
+		if (disableTiming == true) {
+			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
 		}
 	}
 	else {

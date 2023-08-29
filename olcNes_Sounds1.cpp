@@ -86,6 +86,7 @@ private:
 	std::ifstream movieFile;
 	std::ofstream saveFile;
 	int readLines = 0;
+	bool movieFinished = false;
 
 public:
 	olcNES() { 
@@ -132,7 +133,10 @@ public:
 				nes.controller[0] = buttonCode;
 			}
 			else {
-				std::cout << "Movie finished playing" << std::endl;
+				if (movieFinished == false) {
+					std::cout << "Movie finished playing" << std::endl;
+					movieFinished = true;
+				}
 			}
 			//std::cout << inputString << std::endl;
 		}
@@ -458,13 +462,13 @@ private:
 	{
 		if (speedFactor > 1) {
 			renderOutput = false;
-			for (frameCouterSpeedUp = 1; frameCouterSpeedUp < speedFactor;) {
-				frameCouterSpeedUp++;
+			for (frameCouterSpeedUp = 1; frameCouterSpeedUp < speedFactor; frameCouterSpeedUp++) {
 				do {
 					nes.clock();
 				} while (!nes.ppu.frame_complete);
 				nes.ppu.frame_complete = false;
 			}
+			//std::cout << frameCouterSpeedUp << std::endl;
 			renderOutput = true;
 			do {
 				nes.clock();
@@ -653,13 +657,13 @@ void runModdedInstance() {
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BuggedLevelUp.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/LEVEL 256.fm2"; 
-	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
+	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/PushDown.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BType.fm2";
-	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Test.fm2";
 	std::string pathToSave = "C:/Program Files/fceux-2.6.3-win32/movies/Test.fm2";
-	olcNES demo(true, 35, true, false, pathToMovie, pathToSave, true, false, 0);
+	olcNES demo(true, 180, true, false, pathToMovie, pathToSave, true, false, 0);
 	demo.Construct(780, 480, 2, 2);
 	demo.Start();
 }
@@ -886,6 +890,7 @@ bool Bus::clock()
 	if (ppu.nmi)
 	{
 		ppu.nmi = false;
+		//std::cout << "nmi in emulation" << std::endl;
 		cpu.nmi();
 	}
 
@@ -905,6 +910,19 @@ bool Bus::clock()
 	return bAudioSampleReady;
 }
 
+void olc6502::skipPastNMI() {
+	bus->nes->frameCouterSpeedUp++;//can go over the target speed up;
+	//doesn't realy matter because vsync is disabled in speedup mode
+	bus->nes->onFrameEnd();
+	cycles += NMI();
+	bus->ppu.scanline = 241;
+	bus->ppu.cycle = 5;
+	bus->ppu.status.vertical_blank = 1;
+	if (disableTiming == true) {
+		cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
+	}
+}
+
 // Perform one clock cycles worth of emulation
 void olc6502::clock()
 {
@@ -920,16 +938,24 @@ void olc6502::clock()
 	// the next one is ready to be executed.
 	if (cycles == 0)
 	{
-		if (pc == 0xAA32 && useCCode == true) { // wait for NMI Loop or pc == 0xAA4C
-			//std::cout << "Wait for NMI PC:" << pc << std::endl;
-			if (bus->nes->renderOutput == false && bus->nes->speedFactor > 1) {
-				bus->ppu.scanline = 240;
-				bus->ppu.cycle = 5;
+		/*if (pc == 0xAA39) {
+			std::cout << "waiting for NMI?" << std::endl;
+		}*/
+		if (pc == 0xAA36 && useCCode == true) { // wait for NMI Loop or pc == 0xAA4C
+			if (bus->nes->renderOutput == false) {
+				skipPastNMI();
 			}
 			else {
-				if (bus->nes->speedFactor > 1) {
-					while (bus->ppu.scanline < 240) {
-						bus->ppu.clock();
+				//std::cout << "Wait for NMI PC:" << pc << std::endl;
+				if (bus->nes->renderOutput == false && bus->nes->speedFactor > 1) {
+					bus->ppu.scanline = 240;
+					bus->ppu.cycle = 5;
+				}
+				else {
+					if (bus->nes->speedFactor > 1) {
+						while (bus->ppu.scanline < 240) {
+							bus->ppu.clock();
+						}
 					}
 				}
 			}
@@ -1042,7 +1068,6 @@ void olc6502::nmi()
 			cycles += 8;
 		}
 	}
-	skipNMI = false;
 }
 
 void olc2C02::clock()
