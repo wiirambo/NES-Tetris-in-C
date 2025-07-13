@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <stdlib.h>
 #include <stdint.h>
 
 #include "nestetrisclockcyclesuint8_t.h"
@@ -17,6 +16,8 @@ typedef enum {
     ENEOOGEZ,
     CRASHFIX
 } Modifications;
+
+uint8_t fixes = 0;
 
 Modifications modification = CRASHFIX;
 
@@ -164,12 +165,12 @@ uint8_t* playfieldForSecondPlayer;
 uint8_t* musicStagingSq1Lo;
 uint8_t* musicStagingSq1Hi;
 uint8_t* audioInitialized;
+uint8_t* resetSq12ForMusic;
 uint8_t* musicPauseSoundEffectLengthCounter;
 uint8_t* musicStagingSq2Lo;
 uint8_t* musicStagingSq2Hi;
 uint8_t* musicStagingTriLo;
 uint8_t* musicStagingTriHi;
-uint8_t* resetSq12ForMusic;
 uint8_t* musicPauseSoundEffectCounter;
 uint8_t* musicStagingNoiseLo;
 uint8_t* musicStagingNoiseHi;
@@ -223,27 +224,59 @@ uint8_t* highScoreScoresA;
 uint8_t* highScoreScoresB;
 uint8_t* highScoreLevels;
 uint8_t* initMagic;
+uint8_t* defaultHighScoresTable;
+uint8_t* stackBasePointer;
 
 //registers
 uint8_t* accumulator;
 uint8_t* registerX;
 uint8_t* registerY;
 uint16_t* PPUADDR;
+uint8_t* PPUMASK;
+uint8_t* PPUSTATUS;
 uint8_t* fine_x;
 uint16_t* tram_addr;
+uint16_t* vram_addr;
+uint8_t* PPUControlRegister;
 bool* channel1DisableFlag;
 bool* channel2DisableFlag;
 bool* noiseDisableFlag;
+bool* noiseHaltFlag;
+bool* pulse1Start;
+bool* pulse2Start;
+bool* noiseStart;
+bool* pulse1SweepEnabled;
+bool* pulse1SweepReload;
+bool* pulse2SweepReload;
+bool* pulse1SweepDown;
+bool* pulse2SweepDown;
+bool* pulse1Halt;
+bool* pulse2SweepEnabled;
+uint16_t* pulse1SeqTimer;
+uint16_t* pulse2SeqTimer;
+uint16_t* pulse1SeqReload;
 uint16_t* channel1Volume;
 uint16_t* channel2Volume;
 uint16_t* noiseVolume;
-uint32_t* channel1Seqence;
-uint32_t* channel2Seqence;
+uint16_t* noiseReload;
+uint16_t* pulse2SeqReload;
+uint32_t* channel1Sequence;
+uint32_t* channel2Sequence;
+uint32_t* pulse1Sequence;
+uint32_t* pulse2Sequence;
 uint8_t* controller1;
 uint8_t* controller2;
+uint8_t* pulse1Counter;
+uint8_t* pulse2Counter;
+uint8_t* pulse1SweepShift;
+uint8_t* pulse2SweepShift;
+uint8_t* pulse1SweepPeriod;
+uint8_t* pulse2SweepPeriod;
 uint8_t* oam_addr;
 uint8_t* oamdma;
 uint8_t* oamaddr;
+uint8_t* noiseCounter;
+double* pulse1OscDutycycle;
 bool* dmatransfer;
 
 //ROM
@@ -284,6 +317,24 @@ uint8_t* heightToPpuLowAddr;
 uint8_t* heightToPpuHighAddr;
 uint8_t* levelDisplayTable;
 uint8_t* pieceToPpuStatAddr;
+uint8_t* soundEffectSlot1_chirpChirpSq1Vol_table;
+uint8_t* soundEffectSlot1_lineClearing_lo;
+uint8_t* soundEffectSlot1_lineClearing_vol;
+uint8_t* soundEffectSlot1_levelUp_lo;
+uint8_t* soundEffectSlot1_menuScreenSelectInitData;
+uint8_t* loOffTrillNeg2To2Table;
+uint8_t* loOffSlowStartTrillTable;
+uint8_t* loOffDescendToNeg11BounceToNeg9Table;
+uint8_t* loOff9To0FallTable;
+uint8_t* typebSuccessGraphic;
+uint8_t* rocketToXOffsetTable;
+uint8_t* rocketToSpriteTable;
+
+//lenght table for the APU
+uint8_t length_table[] = { 10, 254, 20,  2, 40,  4, 80,  6,
+                                    160,   8, 60, 10, 14, 12, 26, 14,
+                                     12,  16, 24, 18, 48, 20, 96, 22,
+                                    192,  24, 72, 26, 16, 28, 32, 30 };
 
 //base addresses
 //uint8_t* baseAddressROM;
@@ -306,7 +357,7 @@ uint8_t* calculateBaseAddress(uint8_t id) {
     possibleAddressSpace = (uint8_t* )malloc(0x20000);
     addressSpace = (uint8_t*)(((uint64_t)possibleAddressSpace) & (uint64_t)0xFFFFFFFFFFFF0000) + (uint64_t)0x10000; //idk if this defined behavior in C or Cpp
     addressSpaces[id] = addressSpace;
-     baseAddressTBL = addressSpace + 0x2000;
+    baseAddressTBL = addressSpace + 0x2000;
     setBaseAddressRAM();
     setBaseAddressROM();
     return addressSpace;
@@ -363,15 +414,50 @@ void apply_game_genie_code(const char code[], int characters) {//source of infor
 
 void setAPURegisters(bool* channel1Disable, bool* channel2Disable, bool* noiseDisable,
                     uint16_t* channel1Vol, uint16_t* channel2Vol, uint16_t* noiseVol,
-                    uint32_t* channel1Seq, uint32_t* channel2Seq){
+                    uint32_t* channel1Seq, uint32_t* channel2Seq, uint16_t* noiseRel,
+                    bool* noiseHalt, bool* pulse1Sta, bool* pulse2Sta,
+                    bool* noiseSta, uint8_t* noiseCou, uint16_t* pulse1Reload,
+                    uint16_t* pulse1Timer, uint32_t* pulse1Seq, uint8_t* pulse1Cou,
+                    bool* pulse1SweepEna, uint8_t* pulse1SweepPer, bool* pulse1SweepDow,
+                    uint8_t* pulse1SweepShi, bool* pulse1SweepRel, bool* pulse1Hal,
+                    double* pulse1Dutycycle, uint16_t* pulse2SeqRel, bool* pulse2SweepEna,
+                    uint8_t* pulse2SweepPer, bool* pulse2SweepDow, uint8_t* pulse2SweepShi,
+                    bool* pulse2SweepRel, uint16_t* pulse2SeqTim, uint32_t* pulse2Seq,
+                    uint8_t* pulse2Cou){
     channel1DisableFlag = channel1Disable;
     channel2DisableFlag = channel2Disable;
     noiseDisableFlag = noiseDisable;
     channel1Volume = channel1Vol;
     channel2Volume = channel2Vol;
     noiseVolume = noiseVol;
-    channel1Seqence = channel1Seq;
-    channel2Seqence = channel2Seq;
+    channel1Sequence = channel1Seq;
+    channel2Sequence = channel2Seq;
+    noiseReload = noiseRel;
+    noiseHaltFlag = noiseHalt;
+    pulse1Start = pulse1Sta;
+    pulse2Start = pulse2Sta;
+    noiseStart = noiseSta;
+    noiseCounter = noiseCou;
+    pulse1SeqReload = pulse1Reload;
+    pulse1SeqTimer = pulse1Timer;
+    pulse1Sequence = pulse1Seq;
+    pulse1Counter = pulse1Cou;
+    pulse1SweepDown = pulse1SweepDow;
+    pulse1SweepEnabled = pulse1SweepEna;
+    pulse1SweepReload = pulse1SweepRel;
+    pulse1SweepShift = pulse1SweepShi;
+    pulse1SweepPeriod = pulse1SweepPer;
+    pulse1Halt = pulse1Hal;
+    pulse1OscDutycycle = pulse1Dutycycle;
+    pulse2SeqReload = pulse2SeqRel;
+    pulse2SweepEnabled = pulse2SweepEna;
+    pulse2SweepPeriod = pulse2SweepPer;
+    pulse2SweepDown = pulse2SweepDow;
+    pulse2SweepShift = pulse2SweepShi;
+    pulse2SweepReload = pulse2SweepRel;
+    pulse2SeqTimer = pulse2SeqTim;
+    pulse2Sequence = pulse2Seq;
+    pulse2Counter = pulse2Cou;
 }
 
 void setBaseAddressROM() {//baseAddress = 0x8000
@@ -385,6 +471,7 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     pointsTable = addressSpace + 0x9CA5;
     tetriminoTypeFromOrientation = addressSpace + 0x993B;
     spawnTable = addressSpace + 0x994E;
+    rocketToXOffsetTable = addressSpace + 0xAA25;
     demoTetriminoTypeTable = addressSpace + 0xDF00;
     spawnOrientationFromOrientation = addressSpace + 0x9956;
     oamContentLookup = addressSpace + 0x8C6C;
@@ -407,12 +494,24 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     marioFrameToYOffsetTable = addressSpace + 0xA80A;
     luigiFrameToYOffsetTable = addressSpace + 0xA80E;
     luigiFrameToSpriteTable = addressSpace + 0xA818;
+    rocketToSpriteTable = addressSpace + 0xAA11;
     levelToSpriteYOffset = addressSpace + 0x85B2;
     levelToSpriteXOffset = addressSpace + 0x85BC;
     heightToPpuLowAddr = addressSpace + 0x85C6;
     heightToPpuHighAddr = addressSpace + 0x85CC;
     levelDisplayTable = addressSpace + 0x96B8;
     pieceToPpuStatAddr = addressSpace + 0x96AA;
+    defaultHighScoresTable = addressSpace + 0xAD67;
+    typebSuccessGraphic = addressSpace + 0xA42E;
+    soundEffectSlot1_chirpChirpSq1Vol_table = addressSpace + 0xE150;
+    soundEffectSlot1_lineClearing_lo = addressSpace + 0xE4B9;
+    soundEffectSlot1_lineClearing_vol = addressSpace + 0xE4B0;
+    soundEffectSlot1_levelUp_lo = addressSpace + 0xE4F3;
+    soundEffectSlot1_menuScreenSelectInitData = addressSpace + 0xE12C;
+    loOffTrillNeg2To2Table = addressSpace + 0xE6BF;
+    loOffSlowStartTrillTable = addressSpace + 0xE6B5;
+    loOffDescendToNeg11BounceToNeg9Table = addressSpace + 0xE6CF;
+    loOff9To0FallTable = addressSpace + 0xE694;
 }
 
 void setControllers(uint8_t* controller1Input, uint8_t* controller2Input, uint8_t* dma_page, uint8_t* dma_addr, bool* dma_transfer) {
@@ -429,12 +528,16 @@ void setRegisters(uint8_t* acc, uint8_t* X, uint8_t* Y) {
     registerY = Y;
 }
 
-void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fineX, uint16_t* tramaddr, uint8_t* oamAddr) {
+void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fineX, uint16_t* tramaddr, uint16_t* vramaddr, uint8_t* oamAddr, uint8_t* PPUCTRRegister, uint8_t* PPUMaskAddr, uint8_t* PPUStatusReg) {
     PPUADDR = ppuaddr;
     tablePalette = tblPalette;
     fine_x = fineX;
     tram_addr = tramaddr;
+    vram_addr = vramaddr;
     oam_addr = oamAddr;
+    PPUControlRegister = PPUCTRRegister;
+    PPUMASK = PPUMaskAddr;
+    PPUSTATUS = PPUStatusReg;
 }
 
 void setBaseAddressRAM() {
@@ -643,22 +746,654 @@ void setBaseAddressRAM() {
     initMagic = addressSpace + 0x0750;
 }
 
-int updateAudioWaitForNmiAndResetOamStaging() {
+int gameMode_playAndEndingHighScore() {
+    int clockcycles = 9;
+    /*accumulator = *gameModeState;
+    switch (*accumulator) {
+        case 0: clockcycles += gameModeState_initGameBackground(); break;
+        case 1: clockcycles += gameModeState_initGameState(); break;
+        case 2: clockcycles += gameModeState_updateCountersAndNonPlayerState(); break;
+        case 3: clockcycles += gameModeState_handleGameOver(); break;
+        case 4: clockcycles += gameModeState_updatePlayer1(); break;
+        case 5: clockcycles += gameModeState_updatePlayer2(); break;
+        case 6: clockcycles += gameModeState_checkForResetKeyCombo(); break;
+        case 7: clockcycles += gameModeState_startButtonHandling(); break;
+        case 8: clockcycles += gameModeState_vblankThenRunState2(); break;
+    default: printf("Switch Currupted!\r\n");
+    }*/
+    return clockcycles;
+}
+
+int branchOnPlayStatePlayer1(int (*endFrame)()) {
+    int clockcycles = 9;
+    *accumulator = *gameModeState;
+    switch (*accumulator) {
+    case 0: clockcycles += playState_unassignOrientationId(); break;
+    case 1: clockcycles += playState_playerControlsActiveTetrimino(); break;
+    case 2: clockcycles += playState_lockTetrimino(); break;
+    case 3: clockcycles += playState_checkForCompletedRows(); break;
+    case 4: clockcycles += 6; break; //noop
+    case 5: clockcycles += playState_updateLinesAndStatistics(); break;
+    case 6: clockcycles += playState_bTypeGoalCheck(endFrame); break;
+    case 7: clockcycles += playState_receiveGarbage(); break;
+    case 8: clockcycles += playState_spawnNextTetrimino(); break;
+    case 9: clockcycles += 6; break; //noop
+    case 10: clockcycles += playState_updateGameOverCurtain(endFrame); break;
+    case 11: clockcycles += playState_incrementPlayState(); break;
+    default: printf("Switch Currupted!\r\n");
+    }
+    return clockcycles;
+}
+
+int branchOnPlayStatePlayer2(int (*endFrame)()) {
+    int clockcycles = 9;
+    *accumulator = *gameModeState;
+    switch (*accumulator) {
+    case 0: clockcycles += playState_unassignOrientationId(); break;
+    case 1: clockcycles += playState_playerControlsActiveTetrimino(); break;
+    case 2: clockcycles += playState_lockTetrimino(); break;
+    case 3: clockcycles += playState_checkForCompletedRows(); break;
+    case 4: clockcycles += 6; break; //noop
+    case 5: clockcycles += playState_updateLinesAndStatistics(); break;
+    case 6: clockcycles += playState_bTypeGoalCheck(endFrame); break;
+    case 7: clockcycles += playState_receiveGarbage(); break;
+    case 8: clockcycles += playState_spawnNextTetrimino(); break;
+    case 9: clockcycles += 6; break; //noop
+    case 10: clockcycles += playState_updateGameOverCurtain(endFrame); break;
+    case 11: clockcycles += playState_incrementPlayState(); break;
+    default: printf("Switch Currupted!\r\n");
+    }
+    return clockcycles;
+}
+
+int playState_updateGameOverCurtain(int (*endFrame)()) {
+    int clockcycles = 7;
+    if (*curtainRow != 0x14) {
+    }
+    else {
+        clockcycles += 1;
+    }
+    return clockcycles + 6;
+}
+
+int endingAnimation(int (*endFrame)()) {
+    *spriteIndexInOamContentLookup = 2;
+    *renderMode = 4;
+    if (*gameType == 0) {
+        updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+        disableNmi();
+        changeCHRBank0();
+        changeCHRBank1();
+        bulkCopyToPpu(0xF9, 0xD267, endFrame);
+        bulkCopyToPpu(0xF9, 0xAD42, endFrame);
+        selectEndingScreen();
+        waitForVBlankAndEnableNmi(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        *renderMode = 4;
+        setMusicTrack(10);
+        *accumulator = 0x33;
+        //render_endingUnskippable(endFrame);
+    }
+    else {
+    
+    }
+    return 50;
+}
+
+int renderEnding() {
+    int clockcyles = 5;
+    if (*gameType == 0) {
+        if (*ending_customVars != 0) {
+            *spriteYOffset = *ending_customVars;
+            *spriteXOffset = rocketToXOffsetTable[*ending];
+            *spriteIndexInOamContentLookup = rocketToSpriteTable[*ending];
+        }
+        else {
+            clockcyles += 1;
+        }
+    }
+    else {
+        //btype
+    }
+    return clockcyles + 6;
+}
+
+int render_endingUnskippable (int(*endFrame)()) {
+    *sleepCounter = *accumulator;
+    do {
+        renderEnding();
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    } while (*sleepCounter != 0);
+    return 15;
+}
+
+int playState_bTypeGoalCheck(int (*endFrame)()) {
+    int clockcycles = 6;
+    if (*gameType != 0) {
+        if (*lines != 0) {
+            clockcycles += 12;
+            setMusicTrack(*accumulator);
+            *registerY = 0x46;
+            *registerX = 0;
+            while (typebSuccessGraphic[*registerX] != 0x80) {
+                playfield[*registerY] = typebSuccessGraphic[*registerX];
+                (*registerX)++;
+                (*registerY)++;
+            }
+            *player1_vramRow = 0;
+            for (int i = 0; i < 14; i++) {
+                endFrame();
+            }
+            *renderMode = 0;
+            for (int i = 0; i < 0x80; i++) {
+                endFrame();
+            }
+            endingAnimation(endFrame);
+            clockcycles = 9;
+            (*gameModeState)++;
+            *playState = 0;
+            return clockcycles + 6;
+        }
+        else {
+            clockcycles += 1;
+        }
+    }
+    else {
+        clockcycles += 1;
+    }
+    clockcycles += 6;
+    (*playState)++;
+    return clockcycles + 6;
+}
+
+int playState_receiveGarbage() {
+    int clockcycles = 7;
+    if (*numberOfPlayers != 1) {
+        if (*pendingGarbage != 0) {
+            if (*vramRow < 0x20) {
+                clockcycles += 12;
+                *generalCounter2 = multBy10Table[*pendingGarbage];
+                *generalCounter = 0;
+                *registerY = *pendingGarbage;
+                do {
+                    playfield[*generalCounter] = playfield[*generalCounter2];
+                    (*generalCounter)++;
+                    (*generalCounter2)++;
+                    clockcycles += 38;
+                } while (*generalCounter2 != 0xC8);
+                clockcycles += 8;
+                (*registerY)++;
+                *registerX = 0;
+                do {
+                    if (*registerX != *garbageHole) {
+                        *accumulator = 0x78;
+                    }
+                    else {
+                        *accumulator = 0xFF;
+                        clockcycles += 1;
+                    }
+                    playfield[*registerY] = *accumulator;
+                    (*registerX)++;
+                    if (*registerX == 0x0A) {
+                        (*registerX)++;
+                    }
+                    else {
+                        clockcycles += 1;
+                    }
+                    clockcycles += 16;
+                } while (*registerY != 0xC8);
+                *pendingGarbage = 0;
+                *vramRow = 0;
+                clockcycles += 15;
+                (*playState)++;
+            }
+            else {
+                clockcycles += 1;
+            }
+        }
+        else {
+            clockcycles += 6;
+            (*playState)++;
+        }
+    }
+    else {
+        clockcycles += 6;
+        (*playState)++;
+    }
+    return clockcycles + 6;
+}
+
+int copyAddrAtReturnAddressToTmp_incrReturnAddrBy2() {
+    return 2;
+}
+
+int counter2 = 1;
+
+int bulkCopyToPpu(uint8_t stackPointer, uint16_t PC, int(*endFrame)()) {
+    //printf("PC: %0x SP: %0x ", PC,(int)stackPointer);
+    int clockcycles = 0;
+    PC--;
+    addressSpace[0x0100 + stackPointer] = (PC >> 8) & 0x00FF;
+    stackPointer--;
+    addressSpace[0x0100 + stackPointer] = PC & 0x00FF;
+    stackPointer--;
+    addressSpace[5] = addressSpace[0x103 + stackPointer - 2];
+    addressSpace[6] = addressSpace[0x104 + stackPointer - 2];
+    addressSpace[0] = addressSpace[addressSpace[5] + addressSpace[6] * 256 + 1];
+    addressSpace[1] = addressSpace[addressSpace[5] + addressSpace[6] * 256 + 2];
+    addressSpace[0x103 + stackPointer - 2] += 2;
+    if (addressSpace[0x103 + stackPointer - 2] <= 1) {
+        addressSpace[0x104 + stackPointer - 2] += 1; //carry
+    }
+    *registerX = *PPUSTATUS;
+    *registerY = 0;
+    *accumulator = addressSpace[*((uint16_t*)tmp1) + *registerY];
+    int loopcounter = 0;
+    while (*accumulator < 0x80) {
+        loopcounter++;
+        if (*accumulator == 0x60) {
+            *tmp2 = addressSpace[stackPointer];
+            stackPointer++;
+            *tmp1 = addressSpace[stackPointer];
+            stackPointer++;
+            *registerY = 2;
+            *tmp1 += 3;
+            if (*tmp1 <= 2) {
+                *tmp2 += 1;
+            }
+        }
+        else {
+            if (*accumulator == 0x4C) {
+                stackPointer--;
+                addressSpace[stackPointer] = *tmp1;
+                stackPointer--;
+                addressSpace[stackPointer] = *tmp2;
+                (*registerY)++;
+                *((uint16_t*)tmp1) = *((uint16_t*)tmp1 + *registerY);
+                *registerY += 2;
+            }
+            else {
+                stackPointer--;
+                addressSpace[stackPointer] = *accumulator;
+                *PPUADDR = *accumulator << 8;
+                (*registerY)++;
+                *PPUADDR |= addressSpace[*((uint16_t*)tmp1) + *registerY];
+                (*registerY)++;
+                *accumulator = addressSpace[*((uint16_t*)tmp1) + *registerY];
+                bool carry = *accumulator >= 0x80;
+                *accumulator = *accumulator << 1;
+                bool isZero = *accumulator == 0;
+                stackPointer--;
+                addressSpace[stackPointer] = *accumulator;
+                *accumulator = *currentPpuCtrl | 4;
+                if (carry == false) {
+                    *accumulator = *accumulator & 0xFB;
+                }
+                *currentPpuCtrl = *accumulator;
+                *PPUControlRegister = *accumulator;
+                *accumulator = addressSpace[stackPointer];
+                stackPointer++;
+                carry = *accumulator >= 0x80;
+                *accumulator = *accumulator << 1;
+                if (carry == true) {
+                    *accumulator = *accumulator | 2;
+                    (*registerY)++;
+                }
+                isZero;
+                carry = *accumulator & 1;
+                *accumulator = *accumulator >> 1;
+                if (isZero == true) {
+                    *accumulator = *accumulator | 0x80;
+                }
+                carry = *accumulator & 1;
+                *accumulator = *accumulator >> 1;
+                *registerX = *accumulator;
+
+                do {
+                    if (carry == false) {
+                        (*registerY)++;
+                    }
+                    *accumulator = addressSpace[*((uint16_t*)tmp1) + *registerY];
+                    if ((*PPUADDR >= 0x3F00 && *PPUADDR <= 0x3FFF)) {
+                        tablePalette[*PPUADDR & 0x001F] = *accumulator;
+                    }
+                    else {
+                        baseAddressTBL[*PPUADDR & 0x3FF] = *accumulator;
+                    }
+                    (*PPUADDR)++;
+                    (*registerX)--;
+                } while (*registerX > 0);
+
+                *accumulator = addressSpace[stackPointer];
+                stackPointer++;
+
+                if (*accumulator != 0x3F) {
+                    //extra writes to PPUADDR?
+                    *PPUADDR = *accumulator << 8;
+                    *PPUADDR |= *registerX;
+                }
+
+                *tmp1 += *registerY + 1;
+                if (*tmp1 < *registerY) {
+                    *tmp2 += 1;
+                }
+            }
+        }
+        *registerX = *PPUSTATUS;
+        *registerY = 0;
+        *accumulator = addressSpace[*((uint16_t*)tmp1) + *registerY];
+    }
+    //printf("Loops %i: \r\n", loopcounter);
+    if (loopcounter == 10) {
+       endFrame();
+    }
+    return clockcycles + 6;
+}
+
+int gameMode_gameTypeMenu(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    //inc init RAM, does this even work
+    setMMC1Control();
+    *renderMode = 1;
+    updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    disableNmi();
+    bulkCopyToPpu(0xFD, 0x82E6, endFrameNoNMI);
+    bulkCopyToPpu(0xFD, 0x82EB, endFrameNoNMI);
+    changeCHRBank0();
+    changeCHRBank1();
+    waitForVBlankAndEnableNmi(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    *accumulator = musicSelectionTable[*musicType];
+    setMusicTrack;
+    do {
+        *accumulator = 0xFF;
+        *registerX = 2;
+        *registerY = 2;
+        memset_page();
+        if (*newlyPressedButtons_player1 == 0x1) { //rigth
+            *gameType = 1;
+            *soundEffectSlot1Init = 1;
+        }
+        else {
+            if (*newlyPressedButtons_player1 == 0x2) { //left
+                *gameType = 0;
+                *soundEffectSlot1Init = 1;
+            }
+        }
+        bool checkForUp_h = true;
+        if (*newlyPressedButtons_player1 == 0x4) { //down
+            *soundEffectSlot1Init = 1;
+            *accumulator = *musicType;
+            if (*accumulator != 3) {
+                (*musicType)++;
+                *accumulator = musicSelectionTable[*musicType];
+                setMusicTrack(*accumulator);
+            }
+            else {
+                checkForUp_h = false;
+            }
+        }
+        if (checkForUp_h == true) {
+            if (*newlyPressedButtons_player1 == 0x8) { //up
+                *soundEffectSlot1Init = 1;
+                if (*musicType != 0) {
+                    (*musicType)--;
+                    *accumulator = musicSelectionTable[*musicType];
+                    setMusicTrack(*accumulator);
+                }
+            }
+        }
+        if (*newlyPressedButtons_player1 == 0x10) { //start
+            *soundEffectSlot1Init = 2;
+            (*gameMode)++;
+            break;
+        }
+        if (*newlyPressedButtons_player1 == 0x40) { //B
+            *soundEffectSlot1Init = 2;
+            frameCounter[1] = 0;
+            (*gameMode)--;
+            break;
+        }
+        else {
+            *registerY = 0;
+            *accumulator = *gameType * 96 + 0x3F;
+            *spriteXOffset = *accumulator;
+            *spriteYOffset = 0x3F;
+            *spriteIndexInOamContentLookup = 1;
+            if (*frameCounter & 1 == 0) {
+                *spriteIndexInOamContentLookup = 2;
+            }
+            loadSpriteIntoOamStaging();
+            *accumulator = *musicType * 16 + 0x8F;
+            *spriteYOffset = *accumulator;
+            *spriteXOffset = 0x67;
+            *spriteIndexInOamContentLookup = 0x53;
+            if (*frameCounter & 1 == 0) {
+                *spriteIndexInOamContentLookup = 2;
+            }
+        }
+        loadSpriteIntoOamStaging();
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    } while (true);
+
+    return 400; //guess
+}
+
+int gameMode_titleScreen(int (*endFrame)()) {
+    updateAudio2();
+    *renderMode = 0;
+    addressSpace[0xD0] = 0;
+    *displayNextPiece = 0;
+    updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    disableNmi();
+    changeCHRBank0();
+    changeCHRBank1();
+    bulkCopyToPpu(0xFD, 0x826D, endFrame);
+    bulkCopyToPpu(0xFD, 0x8272, endFrame);
+    waitForVBlankAndEnableNmi(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    *accumulator = 0;
+    *registerX = 2;
+    *registerY = 2;
+    memset_page();
+    frameCounter[1] = 0;
+
+    while (*newlyPressedButtons_player1 != 0x10) {
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        if (frameCounter[1] == 5) {
+            *soundEffectSlot1Init = 2;
+            *gameMode = 6;
+            return 100; //guess
+        }
+    }
+    *soundEffectSlot1Init = 2;
+    (*gameMode)++;
+    return 100; //guess
+}
+
+int gamemode_legalScreen(int (*endFrame)()) {
+    int clockcycles = 6;
+    clockcycles += updateAudio2();
+    clockcycles += 5;
+    *renderMode = 0;
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    clockcycles += 6;
+    clockcycles += disableNmi();
+    clockcycles += 8;
+    *accumulator = 0;
+    clockcycles += changeCHRBank0();
+    clockcycles += 8;
+    *accumulator = 0;
+    clockcycles += changeCHRBank1();
+
+    clockcycles += 8;
+    clockcycles += bulkCopyToPpu(0xFB, 0x821A, endFrame);
+    clockcycles += 8;
+    clockcycles += bulkCopyToPpu(0xFB, 0x821F, endFrame);
+
+    clockcycles += 6;
+    clockcycles += waitForVBlankAndEnableNmi(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndResetOamStaging(endFrame);
+
+    clockcycles += 12;
+    *registerX = 2;
+    *registerY = 2;
+    memset_page();
+
+    for (int i = 0; i < 255; i++) {
+        endFrame();
+    }
+    *generalCounter = 0xFF;
+    while (*generalCounter > 0 && *newlyPressedButtons_player1 != 0x10) {
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        (*generalCounter)--;
+    }
+    (*gameMode)++;
+
+    return 100; //guess
+}
+
+int updateAudioWaitForNmiAndResetOamStaging(int (*endFrame)()) {
     int clockcycles = 6;
     //clockcycles += updateAudio_jmp();
     *verticalBlankingInterval = 0;
-
+    endFrame();
     clockcycles = 18; //counting after NMI
-    *accumulator = 0;
-    *registerX = 0;
-    *registerY = 0;
+    *accumulator = 0xFF;
+    *registerX = 2;
+    *registerY = 2;
     clockcycles += memset_page();
     return clockcycles;
 }
 
-int updateAudio_jmp() {
-    int clockcycles = 3;//there is an extra jmp at the beginning
+/*int updateMusic() {
+    int clockcycles = 9;
+    if(*musicTrack != 0xFF){
+        clockcycles += 4;
+        if (*musicTrack == 0) {
+            clockcycles += 6;
+            if (*currentlyPlayingMusicTrack == 0) {
+
+            }
+            else {
+                clockcycles += 4;
+                clockcycles += updateMusicFrame();
+            }
+        }
+        else {
+            clockcycles += 32;
+            *currentAudioSlot = *musicTrack;
+            *musicTrack_dec = *musicTrack;
+            (*musicTrack_dec)--;
+            clockcycles += loadMusicTrack();
+            clockcycles += updateMusicFrame();
+            return clockcycles;
+        }
+    }
+    else {
+        clockcycles += 4;
+        clockcycles += soundEffectSlot2_makesNoSound();
+        return clockcycles;
+    }
     return clockcycles + 6;
+}*/
+
+int LAA82() {
+    int clockcycles = 4;
+    *registerX = 0xFF;
+    *registerY = 0x00;
+    clockcycles += memset_ppu_page_and_more();
+    return clockcycles += 6;
+}
+
+int memset_ppu_page_and_more() {
+    int clockcycles = 44;
+    *tmp1 = *accumulator;
+    *tmp2 = *registerX;
+    *tmp3 = *registerY;
+    *PPUSTATUS = *PPUSTATUS & 0x60;
+    *currentPpuCtrl &= 0xFB;
+    *PPUControlRegister = *currentPpuCtrl;
+
+    *PPUADDR = *accumulator << 8;
+    *PPUADDR |= 0x00;
+    *registerX = 4;
+    if (*accumulator != 0x20) {
+        *registerX = *tmp3;
+    }else{
+        clockcycles += 1;
+    }
+    clockcycles += 5;
+    *registerY = 0;
+    *accumulator = *tmp2;
+    do {
+        do {
+            baseAddressTBL[*PPUADDR & 0x3FF] = *accumulator;
+            (*PPUADDR)++;
+            clockcycles += 9;
+            (*registerY)--;
+        } while (*registerY > 0);
+        clockcycles += 5;
+        (*registerX)--;
+    } while (*registerX > 0);
+    clockcycles += 9;
+    *registerY = *tmp3;
+    *accumulator = *tmp1;
+    if (*accumulator >= 0x20) {
+        clockcycles += 14;
+        *PPUADDR = (*accumulator + 2) << 8;
+        *PPUADDR |= 0xC0;
+        *registerX = 0x40;
+        do {
+            baseAddressTBL[*PPUADDR & 0x3FF] = *registerY;
+            (*PPUADDR)++;
+            clockcycles += 9;
+            (*registerX)--;
+        } while (*registerX > 0);
+        clockcycles--;
+    }
+    else {
+        clockcycles += 1;
+    }
+    clockcycles += 3;
+    *registerX = *tmp2;
+        
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_menuOptionSelectInit(){
+    int clockcycles = 15;
+    *accumulator = 0x03;
+    *registerY = 0x24;
+    clockcycles += initSoundEffectShared();
+    return clockcycles + 6;
+}
+
+int soundEffectSlot0_endingRocketInit() {
+    int clockcycles = 10;
+    *accumulator = 0x20;
+    *registerY = 0x08;
+    clockcycles += initSoundEffectShared();
+    return clockcycles;
+}
+
+int soundEffectSlot0_gameOverCurtainInit() {
+    int clockcycles = 10;
+    *accumulator = 0x40;
+    *registerY = 0x04;
+    clockcycles += initSoundEffectShared();
+    return clockcycles;
 }
 
 int stopSoundEffectSlot0() {
@@ -667,20 +1402,157 @@ int stopSoundEffectSlot0() {
     return 18;
 }
 
-
-int initAudioAndMarkInited() {
-    printf("initAudioAndMarkInited\r\n");
-    int clockcycles = 11;
-    (*audioInitialized)++;
-    clockcycles += muteAudio();
-    musicPauseSoundEffectLengthCounter = 0;
-    return clockcycles + 6;
+int advanceSoundEffectSlot0WithoutUpdate() {
+    int clockcyles = 6;
+    clockcyles += advanceAudioSlotFrame();
+    clockcyles += 2;
+    if (*accumulator == 0) {
+        clockcyles += 12;
+        *soundEffectSlot0Playing = 0;
+        *noiseVolume = 16;
+    }
+    else {
+        clockcyles += 1;
+    }
+    return clockcyles + 6;
 }
 
+int musicLoOffset_setLo_h() {
+    int clockcyles = 9;
+    *accumulator = musicChanInhibit[*registerX];
+    if (*accumulator == 0) {
+        clockcyles += 17;
+        *accumulator += *AUDIOTMP2;
+        printf("Write to address %04x\r\nIngoring it...\r\n", 0x4002 + *registerY);
+    }
+    else {
+        clockcyles += 3;
+    }
+    return clockcyles;
+}
 
+int musicLoOffset_setLoAndSaveFrameCounter_h() {
+    int clockcyles = 13;
+    musicChanLoFrameCounter[*registerX] = *registerY;
+    clockcyles += musicLoOffset_setLo_h();
+    return clockcyles;
+}
 
+int musicLoOffset_8AndC_h() {
+    int clockcycles = 6;
+    if (*AUDIOTMP3 == 0x31) {
+        *registerY = 0x27;
+    }
+    else {
+        clockcycles += 1;
+        *registerY = *AUDIOTMP3;
+    }
+    clockcycles += 19;
+    if (musicChanNote[*registerX] == 0x46) {
+        clockcycles += 9;
+        *accumulator = 0;
+    }
+    else {
+        clockcycles += 7;
+        *accumulator = loOff9To0FallTable[*registerY];
+    }
 
+    clockcycles += musicLoOffset_setLoAndSaveFrameCounter_h();
+    return clockcycles;
+}
 
+int updateMusicFrame_setChanLoOffset() {
+    int clockcyles = 14;
+    *AUDIOTMP3 = musicChanLoFrameCounter[*registerX];
+    if (*AUDIOTMP1 == 0x20) {
+        clockcyles += 8;
+        if (*AUDIOTMP3 == 10) {
+            clockcyles += 2;
+            *registerY = 0;
+        }
+        else {
+            clockcyles += 1;
+            *registerY = *AUDIOTMP3;
+        }
+        *accumulator = loOffTrillNeg2To2Table[*registerY];
+        clockcyles += 10;
+        clockcyles += musicLoOffset_setLoAndSaveFrameCounter_h();
+    }
+    else {
+        clockcyles += 4;
+        if (*AUDIOTMP1 == 0xA0) {
+            clockcyles += 5;
+            if (*AUDIOTMP3 == 0x2B) {
+                clockcyles += 2;
+                *registerY = 0x21;
+            }
+            else {
+                *registerY = *AUDIOTMP3;
+            }
+            clockcyles += 6;
+            *accumulator = loOffSlowStartTrillTable[*registerY];
+            clockcyles += musicLoOffset_setLoAndSaveFrameCounter_h();
+        }
+        else {
+            clockcyles += 4;
+            if (*AUDIOTMP1 == 0x60) {
+                clockcyles += 9;
+                if (musicChanNote[*registerX] < 0x4C) {
+                    //both branches do the same...
+                }
+                else {
+                    clockcyles += 1;
+                }
+                *accumulator = 0xFE;
+                clockcyles *= musicLoOffset_setLo_h();
+            }
+            else {
+                clockcyles += 4;
+                if (*AUDIOTMP1 == 0x40) {
+                    clockcyles += 7;
+                    if (*AUDIOTMP3 <= 0x10) {
+                        clockcyles += 5;
+                        *accumulator = loOffDescendToNeg11BounceToNeg9Table[*registerY];
+                        clockcyles += musicLoOffset_setLo_h();
+                    }
+                    else {
+                        clockcyles += 1;
+                    }
+                }
+                else {
+                    clockcyles += 4;
+                    if (*AUDIOTMP1 == 0x80) {
+                        clockcyles += 1;
+                        clockcyles += musicLoOffset_8AndC_h();
+                    }
+                    else {
+                        clockcyles += 4;
+                        if (*AUDIOTMP1 == 0xC0) {
+                            clockcyles += 1;
+                            clockcyles += musicLoOffset_8AndC_h();
+                        }
+                        else {
+                            //same as 0x20 case;
+                            clockcyles += 8;
+                            if (*AUDIOTMP3 == 10) {
+                                clockcyles += 2;
+                                *registerY = 0;
+                            }
+                            else {
+                                clockcyles += 1;
+                                *registerY = *AUDIOTMP3;
+                            }
+                            *accumulator = loOffTrillNeg2To2Table[*registerY];
+                            clockcyles += 10;
+                            clockcyles += musicLoOffset_setLoAndSaveFrameCounter_h();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return clockcyles + 6;
+}
 
 int computeSoundEffMethod() {
     int clockcycles = 12;
@@ -712,6 +1584,648 @@ int computeSoundEffMethod() {
 
     *accumulator = temp;
     *currentAudioSlot = temp;
+    return clockcycles + 6;
+}
+
+int disableNmi() {
+    *currentPpuCtrl = *currentPpuCtrl & 0x7F;
+    *PPUControlRegister = *currentPpuCtrl;
+    return 18;
+}
+
+int initSq12IfTrashedBySoundEffect() {
+    int clockcycles = 5;
+    if (*resetSq12ForMusic != 0) {
+        clockcycles += 4;
+        if (*resetSq12ForMusic != 1) {
+            clockcycles += 22;
+            //0x4001
+            setsweep2(0x7F);
+            //0x4002
+            *pulse2SeqReload = (*pulse2SeqReload & 0xFF00) | *musicStagingSq2Lo;
+
+            //0x4003
+            setpulseSequence2(*musicStagingSq2Hi);
+        }
+        else {
+            clockcycles += 1;
+        }
+        clockcycles += 26;
+        //0x4001
+        setsweep(0x7F);
+        //0x4002
+        *pulse1SeqReload = (*pulse1SeqReload & 0xFF00) | *musicStagingSq1Lo;
+
+        //0x4003
+        setpulseSequence(*musicStagingSq1Hi);
+
+        *resetSq12ForMusic = 0;
+
+    }
+    else {
+        clockcycles += 1;
+    }
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_menuScreenSelectPlaying() {
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        clockcycles += 13;
+        (*soundEffectSlot1TertiaryCounter)++;
+        if (*soundEffectSlot1TertiaryCounter == 4) {
+            clockcycles += 3;
+            clockcycles += soundEffectSlot1Playing_stop();
+            return clockcycles;
+        }else{
+            clockcycles += 36;
+            *soundEffectSlot1Tmp = *soundEffectSlot1SecondaryCounter >> 4;
+            *soundEffectSlot1SecondaryCounter = *soundEffectSlot1SecondaryCounter - *soundEffectSlot1Tmp - 1;
+            
+            //0x4002
+            *pulse1SeqReload = (*pulse1SeqReload & 0xFF00) | *soundEffectSlot1SecondaryCounter;
+
+            //0x4003
+            setpulseSequence(0x28);
+        }
+    }
+    else {
+        clockcycles += 7;
+        return clockcycles;
+    }
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_menuScreenSelectInit() {
+    int clockcycles = 10;
+    *accumulator = 3;
+    *registerY = 0x2C;
+    clockcycles += initSoundEffectShared();
+    *soundEffectSlot1SecondaryCounter = soundEffectSlot1_menuScreenSelectInitData[2];
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_levelUpInit() {
+    int clockcycles = 7;
+    *accumulator = 6;
+    *registerY = 0x1C;
+    clockcycles += initSoundEffectShared();
+    return clockcycles;
+}
+
+int soundEffectSlot1_levelUpPlaying() {
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        clockcycles += 16;
+        *registerY = *soundEffectSlot1SecondaryCounter;
+        (*soundEffectSlot1SecondaryCounter)++;
+        *accumulator = soundEffectSlot1_levelUp_lo[*registerY];
+        if (*accumulator != 0) {
+            //0x4002
+            clockcycles += 19;
+            *pulse1SeqReload = (*pulse1SeqReload & 0xFF00) | *accumulator;
+            setpulseSequence(0x28);
+        }
+        else {
+            clockcycles += 4;
+            clockcycles += soundEffectSlot1Playing_stop();
+        }
+    }
+    else {
+        return clockcycles + 7;
+    }
+    return clockcycles;
+}
+
+int soundEffectSlot1_tetrisAchievedInit() {
+    //printf("soundEffectSlot1_tetrisAchievedinit\r\n");
+    int clockcycles = 11;
+    *registerY = 0x30;
+    clockcycles += initSoundEffectShared();
+    clockcycles += 7;
+    *soundEffectSlot1TertiaryCounter = 0x10;
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_tetrisAchievedPlaying() {
+    //printf("soundEffectSlot1_tetrisAchievedPlaying\r\n");
+    int clockcycles = 8;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        clockcycles += 5;
+        *registerY = 0x30;
+        clockcycles += LE442();
+    }
+    else {
+        return clockcycles + 7;
+    }
+    return clockcycles;
+}
+
+int soundEffectSlot1_lineClearingPlaying() {
+    //printf("soundEffectSlot1_lineClearingPlaying\r\n");
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        *registerY = 0x38;
+        clockcycles += LE442();
+    }
+    else {
+        return clockcycles + 7;
+    }
+    return clockcycles;
+}
+
+int LE442() {
+    int clockcycles = 6;
+    clockcycles += copyToSq1Channel();
+    clockcycles += 36;
+    *registerY = *soundEffectSlot1SecondaryCounter + *soundEffectSlot1TertiaryCounter;
+    //0x4002
+    uint8_t temp = soundEffectSlot1_lineClearing_lo[*registerY];
+    *pulse1SeqReload = (*pulse1SeqReload & 0xFF00) | temp;
+     //0x4000
+    *accumulator = soundEffectSlot1_lineClearing_vol[*registerY];
+    setpulse(*accumulator);
+    if (*accumulator == 0) {
+        clockcycles += 7;
+        if (*soundEffectSlot1Playing == 4) {
+            clockcycles += 5;
+            *currentAudioSlot = 9;
+            clockcycles += soundEffectSlot1_lineClearingInit();
+        }
+        else {
+            clockcycles += 4;
+            clockcycles += soundEffectSlot1Playing_stop();
+        }
+    }
+    else {
+        clockcycles += 12;
+        (*soundEffectSlot1SecondaryCounter)++;
+        return clockcycles;
+    }
+    return clockcycles;
+}
+
+int soundEffectSlot1_lineClearingInit() {
+    int clockcycles = 14;
+    *accumulator = 4;
+    *registerY = 0x38;
+    clockcycles += initSoundEffectShared();
+    clockcycles += 4;
+    *soundEffectSlot1TertiaryCounter = 0;
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_rotateTetriminoInit() {
+    int clockcycles = 6;
+    clockcycles += LE33B();
+    if (!(*accumulator == 0 || *accumulator == 4 || *accumulator == 6 || *accumulator == 9 || *accumulator == 10)) { //Zero Flag is still set!
+        clockcycles += 13;
+        *accumulator = 0x04;
+        *registerY = 0x14;
+        clockcycles += initSoundEffectShared();
+        clockcycles += soundEffectSlot1_rotateTetriminoPlaying();
+    }
+    else {
+        clockcycles += 7;
+    }
+
+    return clockcycles;
+}
+
+int soundEffectSlot1_rotateTetriminoPlaying() {
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        clockcycles += 11;
+        *accumulator = *soundEffectSlot1SecondaryCounter;
+        (*soundEffectSlot1SecondaryCounter)++;
+        switch (*accumulator) {
+        case 0: *registerY = 0x18; clockcycles += copyToSq1Channel(); clockcycles += 4; break;
+        case 1: *registerY = 0x14; clockcycles += copyToSq1Channel(); clockcycles += 8; break;
+        case 2: *registerY = 0x18; clockcycles += copyToSq1Channel(); clockcycles += 12; break;
+        case 3: clockcycles += soundEffectSlot1Playing_stop(); clockcycles += 16; break;
+        default: return clockcycles + 6;
+        }
+    }
+    else {
+        clockcycles += 1;
+    }
+
+    return clockcycles;
+}
+
+int soundEffectSlot1Playing_stop() {
+   setpulse(0x10);
+    *musicChanInhibit = 0;
+    *soundEffectSlot1Playing = 0;
+    (*resetSq12ForMusic)++;
+    return 27;
+}
+
+int soundEffectSlot1_shiftTetriminoInit() {
+    int clockcycles = 6;
+    clockcycles += LE33B();
+    if (!(*accumulator == 4 || *accumulator == 6 || *accumulator == 9 || *accumulator == 10)) { //Zero Flag is still set!
+        clockcycles += 7;
+        *accumulator = 0x02;
+        *registerY = 0x44;
+        clockcycles += initSoundEffectShared();
+    }
+    else {
+        clockcycles += 7;
+    }
+    return clockcycles;
+}
+
+int soundEffectSlot1_lockTetriminoInit() {
+    int clockcycles = 6;
+    clockcycles += LE33B();
+    if (!(*accumulator == 4 || *accumulator == 6 || *accumulator == 9 || *accumulator == 10)) { //Zero Flag is still set!
+        clockcycles += 7;
+        *accumulator = 0x0F;
+        *registerY = 0x20;
+        clockcycles += initSoundEffectShared();
+    }
+    else {
+        clockcycles += 7;
+    }
+    return clockcycles;
+}
+
+int soundEffectSlot0_makesNoSound() {
+    //printf("soundEffectSlot0_makesNoSound\r\n");
+    int clockcycles = 7;
+    *accumulator = 10;
+    *registerY = 0;
+    clockcycles += initSoundEffectShared();
+    return clockcycles;
+}
+
+int initSoundEffectShared() {
+    int clockcycles = 18;
+    *registerX = *currentSoundEffectSlot;
+    soundEffectSlot0FrameCount[*registerX] = *accumulator;
+    addressSpace[0x06C7 + *registerX] = *registerX;
+    if (*registerY != 0) {
+        switch (*registerX) {
+            case 1: copyToSq1Channel(); clockcycles += 1; break;
+            case 2: copyToSq2Channel(); clockcycles += 5; break;
+            case 3: copyToTriChannel(); clockcycles += 9; break;
+            case 0: copyToNoiseChannel(); clockcycles += 13; break;
+            default: return clockcycles + 6;
+        }
+    }
+    else {
+        clockcycles += 1;
+    }
+    clockcycles += 43;
+    soundEffectSlot0Playing[*registerX] = *currentAudioSlot;
+    soundEffectSlot0FrameCounter[*registerX] = 0;
+    soundEffectSlot0SecondaryCounter[*registerX] = 0;
+    soundEffectSlot0TertiaryCounter[*registerX] = 0;
+    soundEffectSlot0Tmp[*registerX] = 0;
+    *resetSq12ForMusic = 0;
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_menuOptionSelectPlaying() {
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    if (*accumulator == 0) {
+        clockcycles += 12;
+        (*soundEffectSlot1SecondaryCounter)++;
+        if (*soundEffectSlot1SecondaryCounter == 2) {
+            clockcycles += 6;
+            *registerY = 0x2B;
+            clockcycles += copyToSq1Channel();
+        }
+        else {
+            clockcycles += 21;
+            *channel1DisableFlag = true;
+            *musicChanInhibit = 0;
+            *soundEffectSlot1Playing = 0;
+            (*resetSq12ForMusic)++;
+        }
+    }
+    else {
+        clockcycles += 1;
+    }
+
+    return clockcycles + 6;
+}
+
+int soundEffectSlot1_chirpChirpPlaying() {
+    int clockcycles = 5;
+    if (*soundEffectSlot1TertiaryCounter != 0) {
+        (*soundEffectSlot1SecondaryCounter)++;
+        if (*soundEffectSlot1SecondaryCounter == 0x16) {
+            clockcycles += 17;
+            *channel1DisableFlag = true;
+            *musicChanInhibit = 0;
+            *soundEffectSlot1Playing = 0;
+        }
+        else {
+            clockcycles += 1;
+        }
+    }
+    else {
+        clockcycles += 28;
+        *registerY = *soundEffectSlot1SecondaryCounter & 3;
+        setpulse(soundEffectSlot1_chirpChirpSq1Vol_table[*registerY]);
+        (*soundEffectSlot1SecondaryCounter)++;
+        if (*soundEffectSlot1SecondaryCounter == 8) {
+            clockcycles += 8;
+            (*soundEffectSlot1TertiaryCounter)++;
+            *registerY = 0x40;
+            clockcycles += copyToSq1Channel();
+        }
+        else {
+            clockcycles += 1;
+        }
+    }
+    return clockcycles + 6;
+}
+
+int updateAudio_pause() {
+    int clockcycles = 5;
+    if (*audioInitialized != 0) {
+        clockcycles += 5;
+        if (*musicPauseSoundEffectLengthCounter != 0x12) {
+            clockcycles += 7;
+            if (((*musicPauseSoundEffectLengthCounter) & 3) == 3) {
+                clockcycles += 14;
+                (*musicPauseSoundEffectCounter)++;
+                *registerY = 0x10;
+                *accumulator = (*musicPauseSoundEffectCounter) & 1;
+                if (*accumulator == 0) {
+                    clockcycles += 8;
+                    *registerY = 0x0C;
+                }
+                else {
+                    clockcycles += 1;
+                }
+                clockcycles += copyToSq1Channel();
+            }
+            else {
+                clockcycles += 6;
+                (*musicPauseSoundEffectLengthCounter)++;
+            }
+        }
+        else {
+            clockcycles += 1;
+        }
+    }else{
+        clockcycles += 12;
+        (*audioInitialized)++;
+        clockcycles += muteAudio();
+        *musicPauseSoundEffectLengthCounter = 0;
+    }
+    return clockcycles + 6;
+}
+
+int copyToSq1Channel() {
+    int clockcycles = 5;
+    clockcycles = 18;
+    *AUDIOTMP3 = *registerY;
+    *AUDIOTMP4 = 0xE1;
+    *registerY = 0;
+
+    uint8_t temp;
+    
+    //0x4000
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    setpulse(temp);
+    (*registerY)++;
+    clockcycles += 19;
+
+    //0x4001
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    setsweep(temp);
+    (*registerY)++;
+    clockcycles += 19;
+
+    //0x4002
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    *pulse1SeqReload = (*pulse1SeqReload & 0xFF00) | temp;
+    (*registerY)++; 
+    clockcycles += 19;
+
+    //0x4003
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    setpulseSequence(temp);
+    (*registerY)++;
+    clockcycles += 19;
+
+    return clockcycles + 5;
+}
+
+void setpulse(uint8_t value) {//4000
+    switch ((value & 0xC0) >> 6)
+    {
+        case 0x00: *channel1Sequence = 0b01000000; *pulse1OscDutycycle = 0.125; break;
+        case 0x01: *channel1Sequence = 0b01100000; *pulse1OscDutycycle = 0.250; break;
+        case 0x02: *channel1Sequence = 0b01111000; *pulse1OscDutycycle = 0.500; break;
+        case 0x03: *channel1Sequence = 0b10011111; *pulse1OscDutycycle = 0.750; break;
+    }
+    *pulse1Sequence = *channel1Sequence;
+    *pulse1Halt = (value & 0x20);
+    *channel1Volume = (value & 0x0F);
+    *channel1DisableFlag = (value & 0x10);
+}
+
+void setsweep(uint8_t value) {//4001
+    *pulse1SweepEnabled = value & 0x80;
+    *pulse1SweepPeriod = (value & 0x70) >> 4;
+    *pulse1SweepDown = value & 0x08;
+    *pulse1SweepShift = value & 0x07;
+    *pulse1SweepReload = true;
+}
+
+void setsweep2(uint8_t value) {//4005
+    *pulse2SweepEnabled = value & 0x80;
+    *pulse2SweepPeriod = (value & 0x70) >> 4;
+    *pulse2SweepDown = value & 0x08;
+    *pulse2SweepShift = value & 0x07;
+    *pulse2SweepReload = true;
+}
+
+void setpulseSequence(uint8_t value) {//4003
+    *pulse1SeqReload = (uint16_t)((value & 0x07)) << 8 | (*pulse1SeqReload & 0x00FF);
+    *pulse1SeqTimer =  *pulse1SeqReload;
+    *pulse1Sequence = *channel1Sequence;
+    *pulse1Counter = length_table[(value & 0xF8) >> 3];
+    *pulse1Start = true;
+}
+
+void setpulseSequence2(uint8_t value) {//4007
+    *pulse2SeqReload = (uint16_t)((value & 0x07)) << 8 | (*pulse2SeqReload & 0x00FF);
+    *pulse2SeqTimer = *pulse2SeqReload;
+    *pulse2Sequence = *channel2Sequence;
+    *pulse2Counter = length_table[(value & 0xF8) >> 3];
+    *pulse2Start = true;
+}
+
+int copyToTriChannel(){// does nothing; never called???
+    //printf("Tri\r\n"); 
+    int clockcycles = 5;
+    clockcycles += 18;
+    *AUDIOTMP3 = *registerY;
+    *AUDIOTMP4 = 0xE1;
+    *registerY = 0;
+    do {
+        (*registerY)++;
+        clockcycles += 19;
+    } while (*registerY != 4);
+    return clockcycles + 5;
+}
+
+int copyToNoiseChannel() {
+    int clockcycles = 5;
+    clockcycles += 18;
+    *AUDIOTMP3 = *registerY;
+    *AUDIOTMP4 = 0xE1;
+    *registerY = 0;
+
+    uint8_t temp; 
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    
+    *noiseVolume = temp & 0x0F;
+    *noiseDisableFlag = temp & 0x10;
+    *noiseHaltFlag = temp & 0x20;
+    (*registerY)++;
+    clockcycles += 19;
+
+    (*registerY)++;//write to 400D does nothing 
+    clockcycles += 19;
+
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    setNoiseReload(temp);
+    (*registerY)++;
+    clockcycles += 19;
+
+    temp = addressSpace[*((uint16_t*)AUDIOTMP3) + *registerY];
+    setLengthCouter(temp);
+    (*registerY)++;
+    clockcycles += 19;
+
+    return clockcycles + 6;
+}
+
+void setLengthCouter(uint8_t value) {
+    *pulse1Start = true;
+    *pulse2Start = true;
+    *noiseStart = true;
+    *noiseCounter = length_table[(value & 0xF8) >> 3];
+}
+
+int copyToSq2Channel() {// does nothing; never called???
+    //printf("Sq2\r\n");
+    int clockcycles = 2;
+    clockcycles += 18;
+    *AUDIOTMP3 = *registerY;
+    *AUDIOTMP4 = 0xE1;
+    *registerY = 0;
+    do {
+        (*registerY)++;
+        clockcycles += 19;
+    } while (*registerY != 4);
+    return clockcycles;
+}
+
+int LE33B() {
+    int clockcycles = 7;
+    *accumulator = *soundEffectSlot1Playing;
+    switch (*accumulator) {
+        case 4: clockcycles += 1; break;
+        case 6: clockcycles += 5; break;
+        case 9: clockcycles += 9; break;
+        case 10: clockcycles += 13; break;
+        default: clockcycles += 12; break;
+    }
+    return clockcycles + 6;
+}
+
+int updateSoundEffectSlot0_apu() {
+    int clockcycles = 6;
+    clockcycles += advanceAudioSlotFrame();
+    clockcycles += 2;
+    if (*accumulator == 0) {
+    
+    }
+    else {
+        clockcycles += 9;
+        *registerX = 0x54;
+        clockcycles += loadNoiseLo();
+        clockcycles += 8;
+        *registerX = 0x74;
+        clockcycles += getSoundEffectNoiseNibble();
+        //upper 4 bit of the return value will be 0
+        clockcycles += 11;
+        *noiseVolume = *accumulator & 0x0F; 
+        *noiseDisableFlag = true;
+        (*soundEffectSlot0SecondaryCounter)++;
+    }
+    return clockcycles + 6;
+}
+
+int loadNoiseLo() {
+    int clockcycles = 6;
+    clockcycles += getSoundEffectNoiseNibble();
+    clockcycles += 10;
+    setNoiseReload(*accumulator);
+    return clockcycles + 6;
+}
+
+void setNoiseReload(uint8_t value) {
+    switch (value & 0x0F)
+    {
+    case 0x00: *noiseReload = 0; break;
+    case 0x01: *noiseReload = 4; break;
+    case 0x02: *noiseReload = 8; break;
+    case 0x03: *noiseReload = 16; break;
+    case 0x04: *noiseReload = 32; break;
+    case 0x05: *noiseReload = 64; break;
+    case 0x06: *noiseReload = 96; break;
+    case 0x07: *noiseReload = 128; break;
+    case 0x08: *noiseReload = 160; break;
+    case 0x09: *noiseReload = 202; break;
+    case 0x0A: *noiseReload = 254; break;
+    case 0x0B: *noiseReload = 380; break;
+    case 0x0C: *noiseReload = 508; break;
+    case 0x0D: *noiseReload = 1016; break;
+    case 0x0E: *noiseReload = 2034; break;
+    case 0x0F: *noiseReload = 4068; break;
+    }
+};
+
+int getSoundEffectNoiseNibble() {
+    int clockcycles = 22;
+    *AUDIOTMP1 = *registerX;
+    *AUDIOTMP2 = 0xE1;
+    *registerY = *soundEffectSlot0SecondaryCounter >> 1;
+    *AUDIOTMP5 = addressSpace[*((uint16_t *)AUDIOTMP1) + *registerY];
+    if (((*soundEffectSlot0SecondaryCounter) & 1) != 0) {
+        clockcycles += 5;
+        *accumulator = *AUDIOTMP5 & 0x0F;
+    }
+    else {
+        clockcycles += 11;
+        *accumulator = *AUDIOTMP5 >> 4;
+    }
+
+    return clockcycles + 6;
+}
+
+int initAudioAndMarkInited() {
+    //printf("initAudioAndMarkInited\r\n");
+    int clockcycles = 11;
+    (*audioInitialized)++;
+    clockcycles += muteAudio();
+    musicPauseSoundEffectLengthCounter = 0;
     return clockcycles + 6;
 }
 
@@ -765,8 +2279,214 @@ int switch_s_plus_2a() { //invalid offsets etc. are not considered here! doesn't
     return 45;
 }
 
+int setMMC1Control() {
+    //can be ignored Mapper is hardcoded; mapping never changes
+    return 24; // how long do writes to MMC1_Control take?
+}
+int changeCHRBank0(){
+    //can be ignored Mapper is hardcoded; mapping never changes
+    return 24; // how long do writes to MMC1_Control take?
+}
+int changeCHRBank1() {
+    //can be ignored Mapper is hardcoded; mapping never changes
+    return 24; // how long do writes to MMC1_Control take?
+}
+int changePRGBank() {
+    //can be ignored Mapper is hardcoded; mapping never changes
+    return 24; // how long do writes to MMC1_Control take?
+}
+
+int initRamContinued() {
+    int clockcycles = 12;
+    *tmp1 = 0;
+    *tmp2 = 0;
+    *accumulator = 0;
+    clockcycles += 16907;
+    memset(addressSpace + 0x100, 0, 0x600);
+    clockcycles += 8;
+    bool coldBoot_h = false;
+    if (initMagic[0] == 0x12) {
+        clockcycles += 8;
+        if (initMagic[1] == 0x34) {
+            clockcycles += 8;
+            if (initMagic[2] == 0x56) {
+                clockcycles += 8;
+                if (initMagic[3] == 0x78) {
+                    clockcycles += 8;
+                    if (initMagic[4] == 0x9A) {
+                        clockcycles += 6;
+                        //warmBoot
+                    }
+                    else {
+                        clockcycles += 1;
+                        coldBoot_h = true;
+                    }
+                }
+                else {
+                    clockcycles += 1;
+                    coldBoot_h = true;
+                }
+            }
+            else {
+                clockcycles += 1;
+                coldBoot_h = true;
+            }
+        }
+        else {
+            clockcycles += 1;
+            coldBoot_h = true;
+        }
+    }
+    else {
+        clockcycles += 1;
+        coldBoot_h = true;
+    }
+    if (coldBoot_h == true) {
+        *registerX = 0;
+        clockcycles += 2;
+        while (defaultHighScoresTable[*registerX] != 0xFF) {
+            clockcycles += 24;
+            highScoreNames[*registerX] = defaultHighScoresTable[*registerX];
+            (*registerX)++;
+        }
+        clockcycles += 10;
+        initMagic[0] = 0x12;
+        initMagic[1] = 0x34;
+        initMagic[2] = 0x56;
+        initMagic[3] = 0x78;
+        initMagic[4] = 0x9A;
+        clockcycles += 30;
+    }
+    clockcycles += 10;
+    rng_seed[0] = 0x89;
+    rng_seed[1] = 0x88;
+    *registerY = 0;
+    return clockcycles;
+}
+
+int initRAM2(int (*endFrame)()) {
+    int clockcycles = 14;
+    clockcycles += 16;
+    *ppuScrollX = 0;
+    *ppuScrollY = 0;
+    *fine_x = 0;
+    *accumulator = 0x90;
+    *currentPpuCtrl = *accumulator;
+    *PPUControlRegister = *accumulator;
+    tram_addr[0] = 0;
+    vram_addr[0] = 0;
+    *PPUMASK = 0x06;
+    clockcycles += 6;
+    //clockcycles += LE006();
+    clockcycles += updateAudio2();
+    clockcycles += 24;
+    stack[0] = 0xC0;
+    stack[1] = 0x80;
+    stack[3] = 0x35;
+    stack[4] = 0xAC;
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    clockcycles += 6;
+    clockcycles += disableNmi();
+    clockcycles += 8;
+    *accumulator = 0x20;
+    clockcycles = LAA82();
+    *accumulator = 0x24;
+    clockcycles = LAA82();
+    *accumulator = 0x28;
+    clockcycles = LAA82();
+    *accumulator = 0x2c;
+    clockcycles = LAA82();
+
+    clockcycles += 12;
+    *accumulator = 0xEF;
+    *registerX = 0x04;
+    *registerY = 0x05;
+    clockcycles += memset_page();
+
+    clockcycles += 6;
+    clockcycles += waitForVBlankAndEnableNmi(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    clockcycles += 6;
+    clockcycles += updateAudioWaitForNmiAndResetOamStaging(endFrame);
+
+    clockcycles += 23;
+    addressSpace[0x34] = 0x0E;
+    *gameModeState = 0;
+    *gameMode = 0;
+    *numberOfPlayers = 1;
+    frameCounter[1] = 0;
+    return clockcycles;
+}
+
+int updateAudioWaitForNmiAndEnablePpuRendering(int (*endFrame)()) {
+    int clockcycles = 0; //jsr happens before NMI
+    clockcycles += updateAudioAndWaitForNmi(endFrame);
+    clockcycles += 29;
+
+    *fine_x = 0;
+    *tram_addr = 0x0000;
+
+    *PPUControlRegister = *currentPpuCtrl;
+
+    clockcycles += 7;
+    *accumulator = *currentPpuMask | 0x1E;
+    if (accumulator == 0 ) {
+        clockcycles += waitForVBlankAndEnableNmi(endFrame); //incorrect cyclecounting
+        return clockcycles;
+    }
+    else {
+        clockcycles += 12;
+        *PPUMASK = *accumulator;
+        return clockcycles + 6;
+    }
+}
+
+int counter = 0;
+
+int waitForVBlankAndEnableNmi(int (*endFrame)()) {// only cycles after NMI
+    //printf("Enable the NMI %i\r\n", counter);
+    int clockcycles = 16;
+    if (counter > 6) {
+        endFrame(); //doesn't end the frame? Because of timing within the vblank?
+    }
+    counter++;
+    if (*currentPpuCtrl == *currentPpuCtrl | 0x80) {
+        clockcycles += disableNmi();
+        return clockcycles;
+    }
+    else {
+        clockcycles += 8;
+        *currentPpuCtrl = *currentPpuCtrl | 0x80;
+        *PPUControlRegister = *currentPpuCtrl;
+    }
+    
+    return clockcycles + 6;
+}
+
+int updateAudioAndWaitForNmi(int (*endFrame)()) {// only cycles after NMI
+    //updateAudioJMP();
+    //printf("Ending the Frame !\r\n");
+    endFrame();
+    return 12; //depends on the exakt cycle the nmi happens
+}
+
+int updateAudioWaitForNmiAndDisablePpuRendering(int (*endFrame)()) {// only cycles after NMI
+    int clockcycles = updateAudioAndWaitForNmi(endFrame);
+    clockcycles += 12;
+    //*currentPpuMask &= 0xE1;
+    //*PPUMASK = *currentPpuMask;
+    return clockcycles + 6;
+}
+
 int NMI(){
-    //printf("Frame %02x%02x\r\n", addressSpace[0xB2], addressSpace[0xB1]);
+    /*if (((int)addressSpace[0x17] == 5 && (int)addressSpace[0x18] == 0x35) || ((int)addressSpace[0x17] == 2 && (int)addressSpace[0x18] == 0xA9)) {
+        printf("Frame %02x%02x\r\n", addressSpace[0xB2], addressSpace[0xB1]);
+        printf("RNG: %X %X \r\n", (int)addressSpace[0x17], (int)addressSpace[0x18]);
+    }*/
     int clockcycles = 24;
     *oamStagingLength = 0;
     clockcycles += render();
@@ -1080,13 +2800,39 @@ int render_mode_play_and_demo() {
         clockcycles += 7;
         if (*numberOfPlayers != 2) {
             clockcycles += 29;
-            *PPUADDR = 0x20 << 8;
-            *PPUADDR |= 0x73;
-            baseAddressTBL[*PPUADDR & 0x3FF] = *(player1_lines+1);
-            (*PPUADDR)++;
-            *accumulator = *player1_lines;
-            clockcycles += twoDigsToPPU();
-            clockcycles += 8;
+            if ((fixes & 4) == 4) {
+                clockcycles += 31;
+                *PPUADDR = 0x20 << 8;
+                *PPUADDR |= 0x6C;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 21;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 18;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 23;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 14;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 28;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = 36;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *(player1_lines + 1) / 10;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *(player1_lines + 1) % 10;
+                (*PPUADDR)++;
+                *accumulator = *player1_lines;
+                clockcycles += twoDigsToPPU();
+                clockcycles += 8;
+            }
+            else {
+                *PPUADDR = 0x20 << 8;
+                *PPUADDR |= 0x73;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *(player1_lines + 1);
+                (*PPUADDR)++;
+                *accumulator = *player1_lines;
+                clockcycles += twoDigsToPPU();
+                clockcycles += 8;
+            }
             *outOfDateRenderFlags = *outOfDateRenderFlags & 0xFE;
         }
         else {
@@ -1116,12 +2862,26 @@ int render_mode_play_and_demo() {
     if ((*outOfDateRenderFlags & 2) != 0) {
         clockcycles += 7;
         if (*numberOfPlayers != 2) {
-            clockcycles += 31;
-            *generalCounter = levelDisplayTable[*player1_levelNumber];
-            *PPUADDR = 0x22 << 8;
-            *PPUADDR |= 0xBA;
-            *accumulator = *generalCounter;
-            clockcycles += twoDigsToPPU();
+            if ((fixes & 2) == 0) {
+                clockcycles += 31;
+                *generalCounter = levelDisplayTable[*player1_levelNumber];
+                *PPUADDR = 0x22 << 8;
+                *PPUADDR |= 0xBA;
+                *accumulator = *generalCounter;
+                clockcycles += twoDigsToPPU();
+            }
+            else {
+                clockcycles += 31;
+                *generalCounter = levelDisplayTable[*player1_levelNumber];
+                *PPUADDR = 0x22 << 8;
+                *PPUADDR |= 0xB9;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *player1_levelNumber / 100;
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = (*player1_levelNumber % 100 / 10);
+                (*PPUADDR)++;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *player1_levelNumber % 10;
+                (*PPUADDR)++;
+            }
             clockcycles += updatePaletteForLevel();
             clockcycles += 8;
             *outOfDateRenderFlags = *outOfDateRenderFlags & 0xFD;
@@ -1175,8 +2935,16 @@ int render_mode_play_and_demo() {
                 *registerX = *tmpCurrentPiece << 1;
                 *PPUADDR = pieceToPpuStatAddr[*registerX] << 8;
                 *PPUADDR |= pieceToPpuStatAddr[*registerX + 1];
-                baseAddressTBL[*PPUADDR & 0x3FF] = statsByType[*registerX + 1];
-                (*PPUADDR)++;
+                if ((fixes & 1) == 0) {
+                    baseAddressTBL[*PPUADDR & 0x3FF] = statsByType[*registerX + 1];
+                    (*PPUADDR)++;
+                }
+                else {
+                    baseAddressTBL[*PPUADDR & 0x3FF] = statsByType[*registerX + 1] / 10;
+                    (*PPUADDR)++;
+                    baseAddressTBL[*PPUADDR & 0x3FF] = statsByType[*registerX + 1] % 10;
+                    (*PPUADDR)++;
+                }
                 *accumulator = statsByType[*registerX];
                 clockcycles += twoDigsToPPU();
                 clockcycles += 12;
@@ -1473,7 +3241,7 @@ int render_mode_legal_and_title_screens() {
     return 28;
 }
 
-int LA96E() {
+int selectEndingScreen() {
     int clockcycles = 12;
     *ending = 0;
     if (player1_score[2] >= 5) {
@@ -2346,7 +4114,16 @@ int playState_playerControlsActiveTetrimino() {
     return clockcycles + 6;
 }
 
+bool firstTime = false;
+
 int chooseNextTetrimino() {
+    //printf("Next\r\nFrame: %i %i \r\n", (int)addressSpace[0xB1], (int)addressSpace[0xB2]);
+    //printf("RNG: %X %X \r\n", (int)addressSpace[0x17], (int)addressSpace[0x18]);
+    /*if (firstTime == false) {
+        firstTime = true;
+        addressSpace[0x17] = 0x05;
+        addressSpace[0x18] = 0x35;
+    }*/
     int clockcycles = 7;
     if (*gameMode == 5) {
         clockcycles += 28;
@@ -2789,6 +4566,11 @@ int playState_updateLinesAndStatistics(){
 
 int calculate_score() {
     int clockcycles = 16; //Setup the loop
+
+    /*if (*completedLines == 4) {
+        printf("Tetris!\r\n");
+        print_playfield();
+    }*/
     for (int i = 0; i <= *levelNumber; i++) { 
         clockcycles += 21;
         score[0] += pointsTable[2 * *completedLines];
@@ -2844,6 +4626,7 @@ int calculate_score() {
                 clockcycles += 13;
                 score[2] -= 0xA0;
                 addressSpace[0x0F]++;
+                //print_playfield();
             }
             else {
                 clockcycles += 3;
@@ -3198,11 +4981,17 @@ int setMusicTrack(uint8_t number) {
 //functions to print the playfield to the console
 
 void print_playfield() {
-    int digits = 6;
+    int digits;
+    int points;
     if (modification == SEVENDIGITS) {
         digits = 7;
+        uint8_t sevendigitScore[4] = { score[0], score[1], score[2] ,addressSpace[0x0F]};
+        points = int_to_C_format(sevendigitScore, digits);
     }
-    int points = int_to_C_format(score, digits);
+    else {
+        digits = 6;
+        points = int_to_C_format(score, digits);
+    }
     int lines_c = int_to_C_format(lines, 3);
     //system("clear");
     //Frame is paused before the draw call in the FCEUX emulator

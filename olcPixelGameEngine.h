@@ -1292,6 +1292,7 @@ namespace olc
 		void olc_UpdateViewport();
 		void olc_ConstructFontSheet();
 		void olc_CoreUpdate();
+		void olc_CoreUpdate_onlyDraw();
 		void olc_PrepareEngine();
 		void olc_UpdateMouseState(int32_t button, bool state);
 		void olc_UpdateKeyState(int32_t key, bool state);
@@ -3944,6 +3945,131 @@ namespace olc
 			nLastFPS = nFrameCount;
 			fFrameTimer -= 1.0f;
 			std::string sTitle = "OneLoneCoder.com - Pixel Game Engine - " + sAppName + " - FPS: " + std::to_string(nFrameCount);
+			platform->SetWindowTitle(sTitle);
+			nFrameCount = 0;
+		}
+	}
+
+	void PixelGameEngine::olc_CoreUpdate_onlyDraw()
+	{
+		// Handle Timing
+		m_tp2 = std::chrono::system_clock::now();
+		std::chrono::duration<float> elapsedTime = m_tp2 - m_tp1;
+		m_tp1 = m_tp2;
+
+		// Our time per frame coefficient
+		float fElapsedTime = elapsedTime.count();
+		fLastElapsed = fElapsedTime;
+
+		if (bConsoleSuspendTime)
+			fElapsedTime = 0.0f;
+
+		// Some platforms will need to check for events
+		platform->HandleSystemEvent();
+
+		// Compare hardware input states from previous frame
+		auto ScanHardware = [&](HWButton* pKeys, bool* pStateOld, bool* pStateNew, uint32_t nKeyCount)
+			{
+				for (uint32_t i = 0; i < nKeyCount; i++)
+				{
+					pKeys[i].bPressed = false;
+					pKeys[i].bReleased = false;
+					if (pStateNew[i] != pStateOld[i])
+					{
+						if (pStateNew[i])
+						{
+							pKeys[i].bPressed = !pKeys[i].bHeld;
+							pKeys[i].bHeld = true;
+						}
+						else
+						{
+							pKeys[i].bReleased = true;
+							pKeys[i].bHeld = false;
+						}
+					}
+					pStateOld[i] = pStateNew[i];
+				}
+			};
+
+		ScanHardware(pKeyboardState, pKeyOldState, pKeyNewState, 256);
+		ScanHardware(pMouseState, pMouseOldState, pMouseNewState, nMouseButtons);
+
+		// Cache mouse coordinates so they remain consistent during frame
+		vMousePos = vMousePosCache;
+		nMouseWheelDelta = nMouseWheelDeltaCache;
+		nMouseWheelDeltaCache = 0;
+
+		vDroppedFiles = vDroppedFilesCache;
+		vDroppedFilesPoint = vDroppedFilesPointCache;
+		vDroppedFilesCache.clear();
+
+		if (bTextEntryEnable)
+		{
+			UpdateTextEntry();
+		}
+
+		// Handle Frame Update
+		bool bExtensionBlockFrame = false;
+
+		if (bConsoleShow)
+		{
+			SetDrawTarget((uint8_t)0);
+			UpdateConsole();
+		}
+
+
+
+		// Display Frame
+		renderer->UpdateViewport(vViewPos, vViewSize);
+		renderer->ClearBuffer(olc::BLACK, true);
+
+		// Layer 0 must always exist
+		vLayers[0].bUpdate = true;
+		vLayers[0].bShow = true;
+		SetDecalMode(DecalMode::NORMAL);
+		renderer->PrepareDrawing();
+
+		for (auto layer = vLayers.rbegin(); layer != vLayers.rend(); ++layer)
+		{
+			if (layer->bShow)
+			{
+				if (layer->funcHook == nullptr)
+				{
+					renderer->ApplyTexture(layer->pDrawTarget.Decal()->id);
+					if (!bSuspendTextureTransfer && layer->bUpdate)
+					{
+						layer->pDrawTarget.Decal()->Update();
+						layer->bUpdate = false;
+					}
+
+					renderer->DrawLayerQuad(layer->vOffset, layer->vScale, layer->tint);
+
+					// Display Decals in order for this layer
+					for (auto& decal : layer->vecDecalInstance)
+						renderer->DrawDecal(decal);
+					layer->vecDecalInstance.clear();
+				}
+				else
+				{
+					// Mwa ha ha.... Have Fun!!!
+					layer->funcHook();
+				}
+			}
+		}
+
+
+
+		// Present Graphics to screen
+		renderer->DisplayFrame();
+
+		// Update Title Bar
+		fFrameTimer += fElapsedTime;
+		nFrameCount++;
+		if (fFrameTimer >= 1.0f)
+		{
+			nLastFPS = nFrameCount;
+			fFrameTimer -= 1.0f;
+			std::string sTitle = "OneLoneCoder.com - Pixel Game Engine - " + sAppName + " - FPS: " + std::to_string(nFrameCount) + " Only Draw";
 			platform->SetWindowTitle(sTitle);
 			nFrameCount = 0;
 		}

@@ -65,6 +65,7 @@
 #include "olc2C02.h"
 #include "olc2A03.h"
 #include "Cartridge.h"
+
 class Bus
 {
 public:
@@ -73,6 +74,7 @@ public:
 
 public: // Devices on Main Bus
 
+	bool audioDisabled;
 	// The NES console
 	olcNES* nes;
 	// The 6502 derived processor
@@ -140,5 +142,7 @@ public: // System Interface
 	void reset();
 	// Clocks the system - a single whole system tick
 	bool clock();
+
+	bool clockOnlyPPU();
 };
 

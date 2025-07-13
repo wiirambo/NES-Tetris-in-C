@@ -111,6 +111,7 @@ public:
 public:
 
 	bool disableTiming = true;
+	bool audioDisabled = true; //hackfix to disable audio Code
 	// CPU Core registers, exposed as public here for ease of access from external
 	// examinors. This is all the 6502 has.
 	uint8_t  a      = 0x00;		// Accumulator Register
@@ -120,7 +121,7 @@ public:
 	uint16_t pc     = 0x0000;	// Program Counter
 	uint8_t  status = 0x00;		// Status Register
 	
-	void skipPastNMI();
+	void skipPastNMI(bool triggerNMI);
 	int testcounter = 0;
 
 	// External event functions. In hardware these represent pins that are asserted

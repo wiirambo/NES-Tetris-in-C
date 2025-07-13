@@ -137,47 +137,6 @@ void olc6502::write(uint16_t a, uint8_t d)
 	bus->cpuWrite(a, d);
 }
 
-
-
-
-
-///////////////////////////////////////////////////////////////////////////////
-// EXTERNAL INPUTS
-
-// Forces the 6502 into a known state. This is hard-wired inside the CPU. The
-// registers are set to 0x00, the status register is cleared except for unused
-// bit which remains at 1. An absolute address is read from location 0xFFFC
-// which contains a second address that the program counter is set to. This 
-// allows the programmer to jump to a known and programmable location in the
-// memory to start executing from. Typically the programmer would set the value
-// at location 0xFFFC at compile time.
-void olc6502::reset()
-{
-	// Get address to set program counter to
-	addr_abs = 0xFFFC;
-	uint16_t lo = read(addr_abs + 0);
-	uint16_t hi = read(addr_abs + 1);
-
-	// Set it
-	pc = (hi << 8) | lo;
-
-	// Reset internal registers
-	a = 0;
-	x = 0;
-	y = 0;
-	stkp = 0xFD;
-	status = 0x00 | U;
-
-	// Clear internal helper variables
-	addr_rel = 0x0000;
-	addr_abs = 0x0000;
-	fetched = 0x00;
-
-	// Reset takes time
-	cycles = 8;
-}
-
-
 // Interrupt requests are a complex operation and only happen if the
 // "disable interrupt" flag is 0. IRQs can happen at any time, but
 // you dont want them to be destructive to the operation of the running 
@@ -1027,247 +986,6 @@ void olc6502::setFlags() {
 	SetFlag(N, (int8_t)a < 0);
 }
 
-// Instruction: Jump To Location
-// Function:    pc = address
-uint8_t olc6502::JMP()
-{
-	if(useCCode == true){
-		switch (addr_abs) {
-		case 0x81CF:cycles += playState_playerControlsActiveTetrimino();
-					unstack();
-					break; 
-		case 0x81BF:cycles += playState_player2ControlsActiveTetrimino();
-					unstack();
-					break;
-		case 0x82B1:cycles += render_mode_legal_and_title_screens();
-					unstack();
-					break;
-		case 0x85DA:cycles += render_mode_menu_screens();
-					unstack();
-					break;
-		case 0x94EE:cycles += render_mode_play_and_demo();
-					unstack();
-					break;
-		case 0x988E:cycles += playState_spawnNextTetrimino();
-					unstack();
-					break;
-		case 0x99A2:cycles += playState_lockTetrimino();
-					unstack();
-					break;
-		case 0x9A6B:cycles += playState_checkForCompletedRows();
-					unstack();
-					setFlags();
-					break;
-		case 0x9B58:cycles += playState_updateLinesAndStatistics();
-					unstack();
-					break;
-		case 0x9E16:cycles += gameModeState_checkForResetKeyCombo();
-					unstack();
-					break;
-		case 0x9E27:cycles += gameModeState_vblankThenRunState2();
-					unstack();
-					setFlags();
-					break;
-		case 0x9E2F:cycles += playState_unassignOrientationId();
-			std::cout << "unassign ID" << std::endl; //never called?
-					unstack();
-					break;
-		case 0x9E37:cycles += playState_incrementPlayState();
-			std::cout << "PlayState++" << std::endl; //never called?
-					unstack();
-					break;
-		case 0x9E39:cycles += playState_noop();
-					unstack();
-					break;
-		case 0x9F95:cycles += render_mode_ending_animation();
-					unstack();
-					break;
-		case 0xA344:cycles += render_mode_congratulations_screen();
-					unstack();
-					setFlags();
-					break;
-		case 0xA54C:cycles += marioLuigiPeach();
-					unstack();
-					break;
-		case 0xA5A9:cycles += bowser();
-					unstack();
-					break;
-		case 0xA5C1:cycles += donkeyKong();
-					unstack();
-					break;
-		case 0xA5D9:cycles += samus();
-					unstack();
-					break;
-		case 0xA5F1:cycles += link();
-					unstack();
-					break;
-		case 0xA609:cycles += kidIcarus();
-					unstack();
-					break;
-		case 0xE1E5:cycles += initAudioAndMarkInited(); //unused?
-					unstack();
-				std::cout << "jmp" << std::endl;
-					break;
-		case 0xE2E9:cycles += stopSoundEffectSlot0(); //never used?
-					unstack();
-					break;
-		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
-					unstack();
-					setFlags();
-					break;
-		default: pc = addr_abs;
-		}
-
-		if (disableTiming == true) {
-			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
-		}
-		
-		return 0;
-	}else{
-		pc = addr_abs;
-		return 0;
-	}
-}
-
-
-// Instruction: Jump To Sub-Routine
-// Function:    Push current pc to stack, pc = address
-uint8_t olc6502::JSR()
-{
-	if (useCCode == true) {
-		switch (addr_abs){ //cycles only counts of this instruction!!!
-		case 0x804B:cycles += render();
-					break;
-		case 0x829F:cycles += startButtonPressed();//never called?
-			std::cout << "start" << std::endl;
-					break;
-		case 0x82A7:cycles += timeout();//never called?
-			std::cout << "timeout" << std::endl;
-					break;
-		case 0x84AE:cycles += gameMode_levelMenu_handleLevelHeightNavigation();
-					break;
-		//case 0xAB5E:cycles += copyOamStagingToOam();
-					break;
-		case 0x8776:cycles += makePlayer1Active();
-					break;
-		case 0x8792:cycles += makePlayer2Active();
-			std::cout << "player2" << std::endl; //never called?
-					break;
-		case 0x87AE:cycles += savePlayer1State();
-					break;
-		case 0x87C8:cycles += savePlayer1State();
-			std::cout << "save player2" << std::endl; //never called?
-					break;
-		case 0x88AB:cycles += rotate_tetrimino();
-					break;
-		case 0x8914:cycles += drop_tetrimino();
-					break;
-		case 0x89AE:cycles += shift_tetrimino();
-					break;
-		case 0x8A0A:cycles += stageSpriteForCurrentPiece();
-					break;
-		case 0x8BCE:cycles += stageSpriteForNextPiece();
-					break; 
-		case 0x8C27:cycles += loadSpriteIntoOamStaging();
-					break;
-		case 0x9712:cycles += twoDigsToPPU();
-					break;
-		case 0x9725:cycles += copyPlayfieldRowToVRAM();
-					break;
-		case 0x977F:cycles += updateLineClearingAnimation();
-					break;
-		case 0x9808:cycles += updatePaletteForLevel();
-					break;
-		case 0x9874:cycles += noop_disabledVramRowIncr();
-					break;
-		case 0x98EB:cycles += chooseNextTetrimino();
-					break;
-		case 0x9907:cycles += realStart();
-					break;
-		case 0x948B:cycles += isPositionValid();
-					setFlags();
-					break;
-		case 0x9969:cycles += incrementPieceStat();
-					break;
-		case 0x9CAF:cycles += updatePlayfield();
-					setFlags();
-					break;
-		case 0x9D17:cycles += updateMusicSpeed();
-					break;
-		case 0x9D51:cycles += pollControllerButtons();
-					break;
-		case 0x9DE8:cycles += demoButtonsTable_indexIncr();
-					break;
-		case 0xA192:cycles += copyHighScoreNameToNextIndex();
-					break;
-		case 0xA1C1:cycles += copyHighScoreScoreToNextIndex();
-					break;
-		case 0xA1E0:cycles += copyHighScoreLevelToNextIndex();
-					break;
-		case 0xA507:cycles += patchToPpu();
-					break;
-		case 0xA690:cycles += ending_typeBCathedralSetSprite();
-					break;
-		case 0xA6BC:cycles += LA6BC();
-					break;
-		case 0xA96E:cycles += LA96E();
-					break;
-		case 0xAB47:cycles += generateNextPseudorandomNumber();
-					break;
-		case 0xAB69:cycles += pollController_actualRead();
-					break;
-		case 0xAB8B:cycles += addExpansionPortInputAsControllerInput();
-					break;
-		case 0xAB9D:cycles += pollController();
-					break;
-		case 0xAC6A:cycles += memset_page();
-					break;
-		case 0xE003:cycles += updateAudio2();
-					break;
-		case 0xE072:cycles += computeSoundEffMethod();
-					setFlags();
-					break;
-		case 0xE0B5:cycles += advanceAudioSlotFrame();
-					setFlags();
-					break;
-		case 0xE1E5:cycles += initAudioAndMarkInited();//unused?
-					std::cout << "jsr" << std::endl;
-					break;
-		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
-					setFlags();
-					break;
-		case 0xE247:cycles += muteAudioAndClearTriControl();
-					setFlags();
-					break;
-		case 0xE271:cycles += muteAudio();
-					setFlags();
-					break;
-		case 0xEA41:cycles += musicGetNextInstructionByte();
-					setFlags();
-					break;
-		default:	pc--;
-					write(0x0100 + stkp, (pc >> 8) & 0x00FF);
-					stkp--;
-					write(0x0100 + stkp, pc & 0x00FF);
-					stkp--;
-					pc = addr_abs;
-		}
-		if (disableTiming == true) {
-			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
-		}
-	}
-	else {
-		pc--;
-		write(0x0100 + stkp, (pc >> 8) & 0x00FF);
-		stkp--;
-		write(0x0100 + stkp, pc & 0x00FF);
-		stkp--;
-		pc = addr_abs;
-	}
-	return 0;
-}
-
-
 // Instruction: Load The Accumulator
 // Function:    A = M
 // Flags Out:   N, Z
@@ -1443,7 +1161,7 @@ uint8_t olc6502::RTS()
 	pc = (uint16_t)read(0x0100 + stkp);
 	stkp++;
 	pc |= (uint16_t)read(0x0100 + stkp) << 8;
-	
+
 	pc++;
 	return 0;
 }
@@ -1477,7 +1195,6 @@ uint8_t olc6502::SEI()
 	return 0;
 }
 
-
 // Instruction: Store Accumulator at Address
 // Function:    M = A
 uint8_t olc6502::STA()
@@ -1494,16 +1211,6 @@ uint8_t olc6502::STX()
 	write(addr_abs, x);
 	return 0;
 }
-
-
-// Instruction: Store Y Register at Address
-// Function:    M = Y
-uint8_t olc6502::STY()
-{
-	write(addr_abs, y);
-	return 0;
-}
-
 
 // Instruction: Transfer Accumulator to X Register
 // Function:    X = A

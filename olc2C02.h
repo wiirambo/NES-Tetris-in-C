@@ -69,6 +69,7 @@ class olc2C02
 public:
 	olc2C02();
 	~olc2C02();
+	uint32_t frame = 0;
 
 private:		
 	uint8_t*    tblName[2];
@@ -87,11 +88,10 @@ private:
 	// Changed To for API breaking subsequent PGE Update
 	olc::Sprite* sprScreen;
 	olc::Sprite* sprNameTable[2];
-	olc::Sprite* sprPatternTable[2];
 
 public:
 	void ConnectBus(Bus* connectedBus);
-
+	olc::Sprite* sprPatternTable[2];
 	// Debugging Utilities
 	olc::Sprite& GetScreen();
 	olc::Sprite& GetNameTable(uint8_t i);
@@ -180,6 +180,19 @@ private:
 	int16_t scanline = 0;
 	int16_t cycle = 0;
 	bool odd_frame = false;
+	// Foreground "Sprite" rendering ================================
+		// The OAM is an additional memory internal to the PPU. It is
+		// not connected via the any bus. It stores the locations of
+		// 64off 8x8 (or 8x16) tiles to be drawn on the next frame.
+	struct sObjectAttributeEntry
+	{
+		uint8_t y;			// Y position of sprite
+		uint8_t id;			// ID of tile from pattern memory
+		uint8_t attribute;	// Flags define how sprite should be rendered
+		uint8_t x;			// X position of sprite
+	} OAM[64];
+
+	uint8_t* pOAM = (uint8_t*)OAM;
 
 	private:
 	// Background rendering =========================================
@@ -192,18 +205,6 @@ private:
 	uint16_t bg_shifter_attrib_lo  = 0x0000;
 	uint16_t bg_shifter_attrib_hi  = 0x0000;
 
-
-	// Foreground "Sprite" rendering ================================
-	// The OAM is an additional memory internal to the PPU. It is
-	// not connected via the any bus. It stores the locations of
-	// 64off 8x8 (or 8x16) tiles to be drawn on the next frame.
-	struct sObjectAttributeEntry
-	{
-		uint8_t y;			// Y position of sprite
-		uint8_t id;			// ID of tile from pattern memory
-		uint8_t attribute;	// Flags define how sprite should be rendered
-		uint8_t x;			// X position of sprite
-	} OAM[64];
 
 	// A register to store the address when the CPU manually communicates
 	// with OAM via PPU registers. This is not commonly used because it 
@@ -223,8 +224,6 @@ private:
 
 	// The OAM is conveniently package above to work with, but the DMA
     // mechanism will need access to it for writing one byute at a time
-public:
-	uint8_t* pOAM = (uint8_t*)OAM;
 
 
 public:
@@ -244,6 +243,7 @@ public:
 	// Interface
 	void ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge);
 	void clock();
+	void clockOnlyDraw();
 	void reset();
 	bool nmi = false;
 	bool scanline_trigger = false;

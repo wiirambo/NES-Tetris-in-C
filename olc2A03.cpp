@@ -68,7 +68,16 @@ olc2A03::olc2A03()
 {
 	setAPURegisters(&(pulse1_env.disable), &(pulse2_env.disable), &(noise_env.disable),
 					&(pulse1_env.volume), &(pulse2_env.volume), &(noise_env.volume),
-					&(pulse1_seq.new_sequence), &(pulse2_seq.new_sequence));
+					&(pulse1_seq.new_sequence), &(pulse2_seq.new_sequence), &(noise_seq.reload),
+					&noise_halt, &(pulse1_env.start), &(pulse2_env.start), 
+					&(noise_env.start), &(noise_lc.counter), &(pulse1_seq.reload),
+					&(pulse1_seq.timer),&(pulse1_seq.sequence),&(pulse1_lc.counter),
+					&(pulse1_sweep.enabled), &(pulse1_sweep.period), &(pulse1_sweep.down),
+					&(pulse1_sweep.shift), &(pulse1_sweep.reload), &pulse1_halt,
+					&(pulse1_osc.dutycycle), &(pulse2_seq.reload), &(pulse2_sweep.enabled),
+					&(pulse2_sweep.period), &(pulse2_sweep.down), &(pulse2_sweep.shift),
+					&(pulse2_sweep.reload), &(pulse2_seq.timer),&(pulse2_seq.sequence),
+					&(pulse2_lc.counter));
 	noise_seq.sequence = 0xDBDB;
 }
 
@@ -155,6 +164,9 @@ void olc2A03::cpuWrite(uint16_t addr, uint8_t data)
 
 	case 0x4008:
 		//std::cout << "Writing to 0x4008 Does nothing?" << std::endl;
+		break;
+	case 0x400A:
+		//std::cout << "Writing to 0x400A Does nothing?" << std::endl;
 		break;
 
 	case 0x400C:

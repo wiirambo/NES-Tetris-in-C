@@ -58,7 +58,13 @@
 #include <sstream>
 #include <deque>
 #include <thread>
+#include "callBack.h"
 #include "nestetrisclockcyclesuint8_t.h"
+#include "printplayfield.h"
+#include "olcPixelGameEngine.h"
+
+#include <chrono>
+#include <thread>
 
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
@@ -123,6 +129,7 @@ public:
 		if (playMovie == true) {
 			std::string inputString;
 			uint8_t buttonCode = 0;
+			static int frameCounterMovie = 0; 
 			if (getline(movieFile, inputString)) {
 				for (int i = 10; i > 2; i--) {
 					buttonCode = buttonCode << 1;
@@ -130,12 +137,15 @@ public:
 						buttonCode = buttonCode | 1;
 					}
 				}
+				frameCounterMovie++;
 				nes.controller[0] = buttonCode;
 			}
 			else {
 				if (movieFinished == false) {
 					std::cout << "Movie finished playing" << std::endl;
 					movieFinished = true;
+					nes.controller[0] = 0; //no more button presses
+					playMovie = false;
 				}
 			}
 			//std::cout << inputString << std::endl;
@@ -324,6 +334,28 @@ private:
 
 	static olcNES* pInstance; // Static variable that will hold a pointer to "this"
 
+	
+
+	public:
+	static int endFrame() {
+		//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		pInstance->nes.cpu.skipPastNMI(true);
+		if (pInstance->frameCouterSpeedUp == 1 || pInstance->speedFactor == 1) { //already increased
+			pInstance->olc_CoreUpdate_onlyDraw();
+		}
+		return 12;
+	}
+
+	static int endFrameNoNMI() {
+		//std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		pInstance->nes.cpu.skipPastNMI(false);
+		if (pInstance->frameCouterSpeedUp == 1 || pInstance->speedFactor == 1) { //already increased
+			pInstance->olc_CoreUpdate_onlyDraw();
+		}
+		return 12;
+	}
+
+	private:
 	static float SoundOut(int nChannel, float fGlobalTime, float fTimeStep)
 	{
 		if (nChannel == 0)
@@ -349,6 +381,8 @@ private:
 					getline(movieFile, line);
 				}
 				getline(movieFile, line);//skip first input to syncronize with fceux
+				getline(movieFile, line);//skip first input to syncronize with fceux
+				//getline(movieFile, line);//skip first input to syncronize with fceux
 				std::cout << line << std::endl;
 			}
 			else {
@@ -386,7 +420,7 @@ private:
 		}
 		// Load the cartridge
 		//cart = std::make_shared<Cartridge>("../nestest.nes");
-		cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/Tetris (USA).nes", &nes);
+		cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/NESTETRIS/Tetris.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/7DigitScore.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/6to7DigitScore.nes", &nes);
 		//cart = std::make_shared<Cartridge>("C:/Users/User/Desktop/Tetris/speedhack1.1.nes", &nes);
@@ -468,12 +502,21 @@ private:
 				} while (!nes.ppu.frame_complete);
 				nes.ppu.frame_complete = false;
 			}
-			//std::cout << frameCouterSpeedUp << std::endl;
+			//std::cout << "frameCouterSpeedUp " << frameCouterSpeedUp << std::endl;
+			//std::cout << "scanline " << nes.ppu.scanline << std::endl;
+			//std::cout << "frame " << nes.ppu.frame << std::endl;
 			renderOutput = true;
 			do {
 				nes.clock();
 			} while (!nes.ppu.frame_complete);
 			nes.ppu.frame_complete = false;
+			//std::cout << "scanline " << nes.ppu.scanline << std::endl;
+			//std::cout << "frame " << nes.ppu.frame << std::endl;
+
+			/*do {
+				nes.clock();
+			} while (!nes.ppu.frame_complete);
+			nes.ppu.frame_complete = false;*/
 		}
 
 		Clear(olc::DARK_BLUE);
@@ -657,24 +700,31 @@ void runModdedInstance() {
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BuggedLevelUp.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/LEVEL 256.fm2"; 
-	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/PushDown.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BType.fm2";
-	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
+	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Test.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Tetris.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/baxter-tetris-playaround.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/baxter-tetris-modeb.fm2";
 	std::string pathToSave = "C:/Program Files/fceux-2.6.3-win32/movies/Test.fm2";
-	olcNES demo(true, 180, true, false, pathToMovie, pathToSave, true, false, 0);
-	demo.Construct(780, 480, 2, 2);
+	int speedFactor = 1;
+	olcNES demo(true, speedFactor, true, false, pathToMovie, pathToSave, true, false, 0);//speedfactor > 419 freezes not anymore?
+	//demo.use_game_genie_code("XTZXNX"); //disable audio 1
+	//demo.use_game_genie_code("XTLZEX"); //disable audio 2
+	//demo.use_game_genie_code("XTLZOX"); //disable audio 3
+	demo.Construct(780, 501, 2, 2);
 	demo.Start();
 }
 void runUnmoddedInstance() {
-	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BuggedLevelUp.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BType.fm2";
-	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
+	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
 	std::string pathToSave = "C:/Program Files/fceux-2.6.3-win32/movies/test.fm2";
-	olcNES demo2(true, 5, false, false, pathToMovie, pathToSave, true, false, 0);
+	olcNES demo2(true, 1, false, true, pathToMovie, pathToSave, true, false, 0);
 	//demo2.use_game_genie_code("ASAPKG");
 	//demo2.use_game_genie_code("TEAPSK");
 	demo2.Construct(780, 480, 2, 2);
@@ -682,6 +732,456 @@ void runUnmoddedInstance() {
 }
 
 //These functions were moved here so it is after the implementation of the olcNES
+
+// Instruction: Jump To Sub-Routine
+// Function:    Push current pc to stack, pc = address
+int counterTest = 0;
+uint8_t olc6502::JSR()
+{
+	if (useCCode == true) {
+		uint8_t* baseAddress = getAddressSpace(0);
+		switch (addr_abs) { //cycles only counts of this instruction!!!
+		case 0x804B:cycles += render();
+			break;
+		case 0x829F:cycles += startButtonPressed();//never called?
+			std::cout << "start" << std::endl;
+			break;
+		case 0x82A7:cycles += timeout();//never called?
+			std::cout << "timeout" << std::endl;
+			break;
+		case 0x84AE:cycles += gameMode_levelMenu_handleLevelHeightNavigation();
+			break;
+			//case 0xAB5E:cycles += copyOamStagingToOam();
+			break;
+		case 0x8776:cycles += makePlayer1Active();
+			break;
+		case 0x8792:cycles += makePlayer2Active();
+			std::cout << "player2" << std::endl; //never called?
+			break;
+		case 0x87AE:cycles += savePlayer1State();
+			break;
+		case 0x87C8:cycles += savePlayer1State();
+			std::cout << "save player2" << std::endl; //never called?
+			break;
+		case 0x88AB:cycles += rotate_tetrimino();
+			break;
+		case 0x8914:cycles += drop_tetrimino();
+			break;
+		case 0x89AE:cycles += shift_tetrimino();
+			break;
+		case 0x8A0A:cycles += stageSpriteForCurrentPiece();
+			break;
+		case 0x8BCE:cycles += stageSpriteForNextPiece();
+			break;
+		case 0x8C27:cycles += loadSpriteIntoOamStaging();
+			break;
+		case 0x9712:cycles += twoDigsToPPU();
+			break;
+		case 0x9725:cycles += copyPlayfieldRowToVRAM();
+			break;
+		case 0x977F:cycles += updateLineClearingAnimation();
+			break;
+		case 0x9808:cycles += updatePaletteForLevel();
+			break;
+		case 0x9874:cycles += noop_disabledVramRowIncr();
+			break;
+		case 0x98EB:cycles += chooseNextTetrimino();
+			break;
+		case 0x9907:cycles += realStart();
+			break;
+		case 0x948B:cycles += isPositionValid();
+			setFlags();
+			break;
+		case 0x9969:cycles += incrementPieceStat();
+			break;
+		case 0x9CAF:cycles += updatePlayfield();
+			setFlags();
+			break;
+		case 0x9D17:cycles += updateMusicSpeed();
+			break;
+		case 0x9D51:cycles += pollControllerButtons();
+			break;
+		case 0x9DE8:cycles += demoButtonsTable_indexIncr();
+			break;
+		case 0x9E3A:cycles += endingAnimation(&olcNES::endFrame);
+			break;
+		case 0xA192:cycles += copyHighScoreNameToNextIndex();
+			break;
+		case 0xA1C1:cycles += copyHighScoreScoreToNextIndex();
+			break;
+		case 0xA1E0:cycles += copyHighScoreLevelToNextIndex();
+			break;
+		case 0xA507:cycles += patchToPpu();
+			break;
+		case 0xA690:cycles += ending_typeBCathedralSetSprite();
+			break;
+		case 0xA6BC:cycles += LA6BC();
+			break;
+		case 0xA96E:cycles += selectEndingScreen();
+			break;
+		case 0xAA2F:cycles += updateAudioWaitForNmiAndResetOamStaging(&olcNES::endFrame);
+			break;
+		case 0xAA45:cycles += updateAudioAndWaitForNmi(&olcNES::endFrame);
+			break;
+		case 0xAA5F:cycles += updateAudioWaitForNmiAndEnablePpuRendering(&olcNES::endFrame);
+			break;
+		case 0xAA6B:cycles += waitForVBlankAndEnableNmi(&olcNES::endFrameNoNMI);
+			break;
+		case 0xAA78:cycles += disableNmi();
+			break;
+		case 0xAA82:cycles += LAA82();
+			break; 
+		case 0xAA98: //modifies the stack before return
+			cycles += bulkCopyToPpu(stkp, pc, &olcNES::endFrameNoNMI);
+			pc += 2;
+			break;
+		case 0xAB21:cycles += 60;
+			baseAddress[5] = baseAddress[0x103 + stkp - 2];
+			baseAddress[6] = baseAddress[0x104 + stkp - 2];
+			baseAddress[0] = baseAddress[baseAddress[5] + baseAddress[6] * 256 + 1];
+			baseAddress[1] = baseAddress[baseAddress[5] + baseAddress[6] * 256 + 2];
+			baseAddress[0x103 + stkp - 2] += 2;
+			if (baseAddress[0x103 + stkp - 2] <= 1) {
+				baseAddress[0x104 + stkp - 2] =+ 1; //carry
+			}
+			break;
+		case 0xAB47:cycles += generateNextPseudorandomNumber();
+			break;
+		case 0xAB69:cycles += pollController_actualRead();
+			break;
+		case 0xAB8B:cycles += addExpansionPortInputAsControllerInput();
+			break;
+		case 0xAB9D:cycles += pollController();
+			break;
+		case 0xAC1C:cycles += memset_ppu_page_and_more();
+			break;
+		case 0xAC6A:cycles += memset_page();
+			break;
+		case 0xE003:cycles += updateAudio2();
+			break;
+		case 0xE04B:cycles += copyToSq1Channel();
+			break;
+		case 0xE04F:cycles += copyToTriChannel();
+			break;
+		case 0xE053:cycles += copyToNoiseChannel();
+			break;
+		case 0xE057:cycles += copyToSq2Channel();
+			break;
+		case 0xE072:cycles += computeSoundEffMethod();
+			setFlags();
+			break;
+		case 0xE0B5:cycles += advanceAudioSlotFrame();
+			setFlags();
+			break;
+		case 0xE1E5:cycles += initAudioAndMarkInited();//unused?
+			std::cout << "jsr" << std::endl;
+			break;
+		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
+			setFlags();
+			break;
+		case 0xE247:cycles += muteAudioAndClearTriControl();
+			setFlags();
+			break;
+		case 0xE271:cycles += muteAudio();
+			setFlags();
+			break;
+		case 0xE287:cycles += initSoundEffectShared();
+			break;
+		case 0xE2D7:cycles += loadNoiseLo();
+			break;
+		case 0xE31A:cycles += getSoundEffectNoiseNibble();
+			break;
+		case 0xE33B:cycles += LE33B();//needs to set flags
+			//std::cout << "LE33B needs to set flags" << std::endl;
+			if (a == 4 || a == 6 || a == 9 || a == 10) {//setting the correct flags
+				SetFlag(Z, true);
+			}
+			else {
+				SetFlag(Z, false);
+			}
+			break;
+		case 0xE42E:cycles += soundEffectSlot1_lineClearingInit();
+			break;
+		case 0xE637:cycles += updateMusicFrame_setChanLoOffset();
+			break;
+		case 0xE735:cycles += initSq12IfTrashedBySoundEffect();
+			break;
+		case 0xEA41:cycles += musicGetNextInstructionByte();
+			setFlags();
+			break;
+
+		case 0xE000:if (audioDisabled == true) {
+				//print_playfield();
+		}
+				   else {
+			pc--;
+			write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+			stkp--;
+			write(0x0100 + stkp, pc & 0x00FF);
+			stkp--;
+			pc = addr_abs;
+		}
+				   break;
+		default:	pc--;
+			write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+			stkp--;
+			write(0x0100 + stkp, pc & 0x00FF);
+			stkp--;
+			pc = addr_abs;
+		}
+		if (disableTiming == true) {
+			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
+		}
+	}
+	else {
+		pc--;
+		write(0x0100 + stkp, (pc >> 8) & 0x00FF);
+		stkp--;
+		write(0x0100 + stkp, pc & 0x00FF);
+		stkp--;
+		pc = addr_abs;
+	}
+	return 0;
+}
+
+// Instruction: Jump To Location
+// Function:    pc = address
+uint8_t olc6502::JMP()
+{
+	if (useCCode == true) {
+		switch (addr_abs) {
+		case 0x81CF:cycles += playState_playerControlsActiveTetrimino();
+			unstack();
+			break;
+		case 0x81BF:cycles += playState_player2ControlsActiveTetrimino();
+			unstack();
+			break;
+		case 0x8200:cycles += gamemode_legalScreen(&olcNES::endFrame);
+			unstack();
+			break;
+		case 0x824F:cycles += gameMode_titleScreen(&olcNES::endFrame);
+			unstack();
+			break;
+		case 0x82D1:cycles += gameMode_gameTypeMenu(&olcNES::endFrame, &olcNES::endFrameNoNMI);
+			unstack();
+			break;
+		case 0x82B1:cycles += render_mode_legal_and_title_screens();
+			unstack();
+			break;
+		case 0x85DA:cycles += render_mode_menu_screens();
+			unstack();
+			break;
+		case 0x94EE:cycles += render_mode_play_and_demo();
+			unstack();
+			break;
+		case 0x988E:cycles += playState_spawnNextTetrimino();
+			unstack();
+			break;
+		case 0x99A2:cycles += playState_lockTetrimino();
+			unstack();
+			break;
+		case 0x9A6B:cycles += playState_checkForCompletedRows();
+			unstack();
+			setFlags();
+			break;
+		case 0x9B03:cycles += playState_receiveGarbage();
+			unstack();
+			setFlags();
+			break;
+		case 0x9B58:cycles += playState_updateLinesAndStatistics();
+			unstack();
+			break;
+		case 0x9E16:cycles += gameModeState_checkForResetKeyCombo();
+			unstack();
+			break;
+		case 0x9E27:cycles += gameModeState_vblankThenRunState2();
+			unstack();
+			setFlags();
+			break;
+		case 0x9E2F:cycles += playState_unassignOrientationId();
+			std::cout << "unassign ID" << std::endl; //never called?
+			unstack();
+			break;
+		case 0x9E37:cycles += playState_incrementPlayState();
+			std::cout << "PlayState++" << std::endl; //never called?
+			unstack();
+			break;
+		case 0x9E39:cycles += playState_noop();
+			unstack();
+			break;
+		case 0x9F95:cycles += render_mode_ending_animation();
+			unstack();
+			break;
+		case 0xA344:cycles += render_mode_congratulations_screen();
+			unstack();
+			setFlags();
+			break;
+		case 0xA54C:cycles += marioLuigiPeach();
+			unstack();
+			break;
+		case 0xA5A9:cycles += bowser();
+			unstack();
+			break;
+		case 0xA5C1:cycles += donkeyKong();
+			unstack();
+			break;
+		case 0xA5D9:cycles += samus();
+			unstack();
+			break;
+		case 0xA5F1:cycles += link();
+			unstack();
+			break;
+		case 0xA609:cycles += kidIcarus();
+			unstack();
+			break;
+		case 0xE1E5:cycles += initAudioAndMarkInited(); //unused?
+			unstack();
+			std::cout << "jmp" << std::endl;
+			break;
+		case 0xE2DD:cycles += soundEffectSlot0_makesNoSound();
+			unstack();
+			break;
+		case 0xE2E4:cycles += advanceSoundEffectSlot0WithoutUpdate();
+			unstack();
+			break;
+		case 0xE2E9:cycles += stopSoundEffectSlot0(); //never used?
+			unstack();
+			break;
+		case 0xE244:cycles += soundEffectSlot2_makesNoSound();
+			unstack();
+			setFlags();
+			break;
+		case 0xE287:cycles += initSoundEffectShared();
+			unstack();
+			break;
+		case 0xE2CC:cycles += soundEffectSlot0_endingRocketInit();
+			unstack();
+			break;
+		case 0xE2F8:cycles += soundEffectSlot0_gameOverCurtainInit();
+			unstack();
+			break;
+		case 0xE2FF:cycles += updateSoundEffectSlot0_apu();
+			unstack();
+			break;
+		case 0xE34F:cycles += soundEffectSlot1_chirpChirpPlaying();
+			unstack();
+			break;
+		case 0xE384:cycles += soundEffectSlot1_lockTetriminoInit();
+			unstack();
+			break;
+		case 0xE390:cycles += soundEffectSlot1_shiftTetriminoInit();
+			unstack();
+			break;
+		case 0xE3A1:cycles += soundEffectSlot1Playing_stop();
+			unstack();
+			break;
+		case 0xE3B3:cycles += soundEffectSlot1_menuOptionSelectPlaying();
+			unstack();
+			break;
+		case 0xE3CA:cycles += soundEffectSlot1_menuOptionSelectInit();
+			unstack();
+			break;
+		case 0xE3D1:cycles += soundEffectSlot1_rotateTetriminoInit();
+			unstack();
+			break;
+		case 0xE3DD:cycles += soundEffectSlot1_rotateTetriminoPlaying();
+			unstack();
+			break;
+		case 0xE403:cycles += soundEffectSlot1_tetrisAchievedInit();
+			unstack();
+			break;
+		case 0xE40E:cycles += soundEffectSlot1_tetrisAchievedPlaying();
+			unstack();
+			break;
+		case 0xE42E:cycles += soundEffectSlot1_lineClearingInit();
+			unstack();
+			break;
+		case 0xE43B:cycles += soundEffectSlot1_lineClearingPlaying();
+			unstack();
+			break;
+		case 0xE473:cycles += soundEffectSlot1_menuScreenSelectInit();
+			unstack();
+			break;
+		case 0xE481:cycles += soundEffectSlot1_menuScreenSelectPlaying();
+			unstack();
+			break;
+		case 0xE4EC:cycles += soundEffectSlot1_levelUpInit();
+			unstack();
+			break;
+		case 0xE4D1:cycles += soundEffectSlot1_levelUpPlaying();
+			unstack();
+			break;
+		default: pc = addr_abs;
+		}
+
+		if (disableTiming == true) {
+			cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
+		}
+
+		return 0;
+	}
+	else {
+		pc = addr_abs;
+		return 0;
+	}
+}
+// Instruction: Store Y Register at Address
+// Function:    M = Y
+uint8_t olc6502::STY()
+{
+	if (pc == 0x80C7) { //has to be done like this something still needs to be setup in the emulator
+		cycles += initRAM2(&olcNES::endFrame);
+		pc = 0x8138;
+		//write(addr_abs, y);
+	}
+	else {
+		write(addr_abs, y);
+	}
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// EXTERNAL INPUTS
+
+// Forces the 6502 into a known state. This is hard-wired inside the CPU. The
+// registers are set to 0x00, the status register is cleared except for unused
+// bit which remains at 1. An absolute address is read from location 0xFFFC
+// which contains a second address that the program counter is set to. This 
+// allows the programmer to jump to a known and programmable location in the
+// memory to start executing from. Typically the programmer would set the value
+// at location 0xFFFC at compile time.
+void olc6502::reset()
+{
+	// Get address to set program counter to
+	pc = 0x80C5;
+	status = 0x00 | U;
+
+	SetFlag(D, false);
+	SetFlag(I, true);
+	bus->nes->onFrameEnd();//game waits for 2 frames
+	bus->nes->onFrameEnd();
+	cycles = 18;
+	a = 0x10;
+	cycles += setMMC1Control();
+	cycles += 8;
+	cycles += changeCHRBank0();
+	cycles += 8;
+	cycles += changeCHRBank1();
+	cycles += 8;
+	cycles += changePRGBank();
+	cycles += 14;
+	x = 0;
+	cycles += initRamContinued();
+
+	// Reset internal registers
+	stkp = 0xFF;
+
+	// Clear internal helper variables
+	addr_rel = 0x0000;
+	addr_abs = 0x0000;
+	fetched = 0x00;
+	
+}
 
 void olc2C02::ConnectBus(Bus* connectedBus) {
 	bus = connectedBus;
@@ -795,6 +1295,7 @@ Cartridge::Cartridge(const std::string& sFileName, Bus* connectedBus)
 void olc6502::ConnectBus(Bus* connectedBus) {
 	bus = connectedBus;
 	useCCode = bus->nes->useCCode;
+	audioDisabled = !(bus->nes->outputAudio);
 	setRegisters(&a, &x, &y);
 }
 
@@ -910,14 +1411,105 @@ bool Bus::clock()
 	return bAudioSampleReady;
 }
 
-void olc6502::skipPastNMI() {
+bool Bus::clockOnlyPPU()
+{
+	// Clocking. The heart and soul of an emulator. The running
+	// frequency is controlled by whatever calls this function.
+	// So here we "divide" the clock as necessary and call
+	// the peripheral devices clock() function at the correct
+	// times.
+
+	// The fastest clock frequency the digital system cares
+	// about is equivalent to the PPU clock. So the PPU is clocked
+	// each time this function is called...
+
+	ppu.clock();
+
+	// The CPU runs 3 times slower than the PPU so we only call its
+	// clock() function every 3 times this function is called. We
+	// have a global counter to keep track of this.
+	if (nSystemClockCounter % 3 == 0)
+	{
+		// Is the system performing a DMA transfer form CPU memory to 
+		// OAM memory on PPU?...
+		if (dma_transfer)
+		{
+			// ...Yes! We need to wait until the next even CPU clock cycle
+			// before it starts...
+			if (dma_dummy)
+			{
+				// ...So hang around in here each clock until 1 or 2 cycles
+				// have elapsed...
+				if (nSystemClockCounter % 2 == 1)
+				{
+					// ...and finally allow DMA to start
+					dma_dummy = false;
+				}
+			}
+			else
+			{
+				// DMA can take place!
+				if (nSystemClockCounter % 2 == 0)
+				{
+					// On even clock cycles, read from CPU bus
+					dma_data = cpuRead(dma_page << 8 | dma_addr);
+				}
+				else
+				{
+					// On odd clock cycles, write to PPU OAM
+					ppu.pOAM[dma_addr] = dma_data;
+					// Increment the lo byte of the address
+					dma_addr++;
+					// If this wraps around, we know that 256
+					// bytes have been written, so end the DMA
+					// transfer, and proceed as normal
+					if (dma_addr == 0x00)
+					{
+						dma_transfer = false;
+						dma_dummy = true;
+					}
+				}
+			}
+		}
+	}
+
+	// Synchronising with Audio
+	bool bAudioSampleReady = false;
+
+	nSystemClockCounter++;
+
+	return bAudioSampleReady;
+}
+
+void olc6502::skipPastNMI(bool triggerNMI) {
 	bus->nes->frameCouterSpeedUp++;//can go over the target speed up;
 	//doesn't realy matter because vsync is disabled in speedup mode
+	if (bus->nes->renderOutput == true) {
+		for (int i = 0; i < 64; i++) {
+			uint8_t* oamStaging = getAddressSpace(0) + 0x200;
+			bus->ppu.OAM[i].y = oamStaging[i * 4];
+			bus->ppu.OAM[i].id = oamStaging[i * 4 + 1];
+			bus->ppu.OAM[i].attribute = oamStaging[i * 4 + 2];
+			bus->ppu.OAM[i].x = oamStaging[i * 4 + 3];
+		}
+		bus->ppu.scanline = -1;
+		bus->ppu.cycle = 0;
+		bus->ppu.status.vertical_blank = 0;
+		bus->ppu.frame_complete = false;
+		while (bus->ppu.scanline < 240) {
+			bus->ppu.clock();
+		}
+	}
 	bus->nes->onFrameEnd();
-	cycles += NMI();
-	bus->ppu.scanline = 241;
-	bus->ppu.cycle = 5;
+	if (triggerNMI == true) {
+		cycles += NMI();
+	}
+	bus->ppu.scanline = 261;
+	bus->ppu.cycle = 341;
 	bus->ppu.status.vertical_blank = 1;
+	bus->ppu.frame++;
+	bus->ppu.frame_complete = true;
+	bus->ppu.odd_frame = !bus->ppu.odd_frame;
 	if (disableTiming == true) {
 		cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
 	}
@@ -938,15 +1530,11 @@ void olc6502::clock()
 	// the next one is ready to be executed.
 	if (cycles == 0)
 	{
-		/*if (pc == 0xAA39) {
-			std::cout << "waiting for NMI?" << std::endl;
-		}*/
 		if (pc == 0xAA36 && useCCode == true) { // wait for NMI Loop or pc == 0xAA4C
 			if (bus->nes->renderOutput == false) {
-				skipPastNMI();
+				skipPastNMI(true);
 			}
 			else {
-				//std::cout << "Wait for NMI PC:" << pc << std::endl;
 				if (bus->nes->renderOutput == false && bus->nes->speedFactor > 1) {
 					bus->ppu.scanline = 240;
 					bus->ppu.cycle = 5;
@@ -988,7 +1576,7 @@ void olc6502::clock()
 
 		// Perform operation
 		uint8_t additional_cycle2 = (this->*lookup[opcode].operate)();
-
+		//std::cout << (this->lookup[opcode]).name << std::endl;
 		// The addressmode and opcode may have altered the number
 		// of cycles this instruction requires before its completed
 		cycles += (additional_cycle1 & additional_cycle2);
@@ -1019,25 +1607,6 @@ void olc6502::clock()
 	// Decrement the number of cycles remaining for this instruction
 	cycles--;
 }
-
-// A Non-Maskable Interrupt cannot be ignored. It behaves in exactly the
-// same way as a regular IRQ, but reads the new program counter address
-// form location 0xFFFA.
-
-/*int olc6502::skipPastNMI() {
-	testCounter++;
-	std::cout << "NMI! Test: " << bus->ppu.scanline << " " << bus->nes->frameCouterSpeedUp << std::endl;
-
-	skipNMI = true;
-	bus->ppu.frame_complete = false;
-	bus->ppu.scanline = -1;
-	bus->ppu.cycle = 2;
-	bus->ppu.status.vertical_blank = 1;
-	bus->nes->frameCouterSpeedUp += 1;
-	bus->nes->onFrameEnd();
-	//printf("NMI!\r\n");
-	return 8 + NMI();
-}*/
 
 void olc6502::nmi()
 {
@@ -1082,6 +1651,7 @@ void olc2C02::clock()
 			{
 				scanline = -1;
 				frame_complete = true;
+				frame++;
 				odd_frame = !odd_frame;
 			}
 		}
@@ -1961,6 +2531,7 @@ void olc2C02::clock()
 			scanline = -1;
 			frame_complete = true;
 			odd_frame = !odd_frame;
+			frame++;
 		}
 	}
 }
