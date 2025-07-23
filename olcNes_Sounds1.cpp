@@ -1527,7 +1527,14 @@ bool Bus::clockOnlyPPU()
 }
 
 void olc6502::skipPastNMI(bool triggerNMI) {
-	bus->nes->frameCouterSpeedUp++;//can go over the target speed up;
+	(bus->nes->frameCouterSpeedUp)++;//can go over the target speed up;
+	if (bus->nes->frameCouterSpeedUp >= bus->nes->speedFactor) {
+		bus->nes->frameCouterSpeedUp = 0;
+		bus->nes->renderOutput = true;
+	}
+	else {
+		bus->nes->renderOutput = false;
+	}
 	//doesn't realy matter because vsync is disabled in speedup mode
 	if (bus->nes->renderOutput == true) {
 		for (int i = 0; i < 64; i++) {
@@ -1556,7 +1563,7 @@ void olc6502::skipPastNMI(bool triggerNMI) {
 	bus->ppu.frame_complete = true;
 	bus->ppu.odd_frame = !bus->ppu.odd_frame;
 	if (disableTiming == true) {
-		cycles = 1; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
+		cycles = 10; //hack fix speedup if frame is never overrun by the score loop timing doesn't matter
 	}
 }
 

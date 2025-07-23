@@ -227,6 +227,7 @@ uint8_t* initMagic;
 uint8_t* defaultHighScoresTable;
 uint8_t* byteToBcdTable;
 uint8_t* stackBasePointer;
+uint8_t* totalScore;
 
 //registers
 uint8_t* accumulator;
@@ -339,6 +340,10 @@ uint8_t* highScoreNamePosToX;
 uint8_t* highScorePosToY;
 uint8_t* rocketToJetSpriteTable;
 uint8_t* rocketToJetXOffsetTable;
+uint8_t* ending_typeBCathedralFrameDelayTable;
+uint8_t* ending_typeBCathedralYTable;
+uint8_t* ending_typeBCathedralVectorTable;
+uint8_t* ending_typeBCathedralXTable;
 
 //CHR Banks
 uint8_t* CHRBank0;
@@ -431,6 +436,8 @@ void apply_game_genie_code(const char code[], int characters) {//source of infor
 void setCHRBanks(uint8_t* nCHRBankSelect4Lo, uint8_t* nCHRBankSelect4Hi) {
     CHRBank0 = nCHRBankSelect4Lo;
     CHRBank1 = nCHRBankSelect4Hi;
+    *CHRBank0 = 0;
+    *CHRBank1 = 0;
 }
 
 void setAPURegisters(bool* channel1Disable, bool* channel2Disable, bool* noiseDisable,
@@ -511,7 +518,10 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     highScoreIndexToHighScoreScoresOffset = addressSpace + 0xA1F9;
     highScorePosToY = addressSpace + 0xA33B;
     highScoreNamePosToX = addressSpace + 0xA33E;
+    ending_typeBCathedralVectorTable = addressSpace + 0xA771;
     ending_typeBCathedralAnimSpeed = addressSpace + 0xA749;
+    ending_typeBCathedralXTable = addressSpace + 0xA77B;
+    ending_typeBCathedralYTable = addressSpace + 0xA7B7;
     ending_typeBCathedralSpriteTable = addressSpace + 0xA7F3;
     LA735 = addressSpace + 0xA735;
     LA73D = addressSpace + 0xA73D;
@@ -519,6 +529,7 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     LAA2A = addressSpace + 0xAA2A;
     domeNumberToXOffsetTable = addressSpace + 0xA739;
     domeNumberToXSpriteTable = addressSpace + 0xA741;
+    ending_typeBCathedralFrameDelayTable = addressSpace + 0xA753;
     marioFrameToYOffsetTable = addressSpace + 0xA80A;
     luigiFrameToYOffsetTable = addressSpace + 0xA80E;
     luigiFrameToSpriteTable = addressSpace + 0xA818;
@@ -688,6 +699,7 @@ void setBaseAddressRAM() {
     highScoreEntryNameOffsetForRow = addressSpace + 0x00D6;
     highScoreEntryCurrentLetter = addressSpace + 0x00D7;
     lineClearStatsByType = addressSpace + 0x00D8;
+    totalScore = addressSpace + 0x00DC;
     displayNextPiece = addressSpace + 0x00DF;
     AUDIOTMP1 = addressSpace + 0x00E0;
     AUDIOTMP2 = addressSpace + 0x00E1;
@@ -809,19 +821,92 @@ int endingAnimation(int (*endFrame)()) {
             updateAudioWaitForNmiAndResetOamStaging(endFrame);
         } while (ending_customVars[0] != 0 || *newlyPressedButtons_player1 != 0x10);
     }
-    else {
-        /*bulkCopyToPpu(0xF7, 0xC9A6, endFrame);
-        bulkCopyToPpu(0xF7, 0xAD43, endFrame);
-
+    else{
+        *levelNumber = levelDisplayTable[*player1_levelNumber] & 0x0F;
+        totalScore[0] = 0;
+        totalScore[1] = 0;
+        totalScore[2] = 0;
+        *generalCounter4 = *levelNumber << 4;
+        *generalCounter5 = *player1_startHeight << 4;
+        updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+        disableNmi();
+        if (*levelNumber == 9) {
+            *accumulator = 1;
+            changeCHRBank0();
+            *accumulator = 1;
+            changeCHRBank1();
+            bulkCopyToPpu(0xF7, 0x9E83, endFrame); //todo
+        }
+        else {
+            *registerX = 3;
+            if (*levelNumber != 2) {
+                if (*levelNumber != 6) {
+                    *registerX = 2;
+                }
+            }
+            *accumulator = *registerX;
+            changeCHRBank0();
+            *accumulator = 2;
+            changeCHRBank1();
+            bulkCopyToPpu(0xF7, 0x9EA2, endFrame);
+        }
+        bulkCopyToPpu(0xF7, 0x9EA7, endFrame);
+        ending_initTypeBVars();
         waitForVBlankAndEnableNmi(endFrame);
         updateAudioWaitForNmiAndResetOamStaging(endFrame);
         updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
         updateAudioWaitForNmiAndResetOamStaging(endFrame);
-        endFrame();
-        endFrame();
-        endFrame();
-        endFrame();*/
-
+        *renderMode = 4;
+        setMusicTrack(10);
+        *accumulator = 0x66;
+        render_endingUnskippable(endFrame);
+        totalScore[0] = player1_score[0];
+        totalScore[1] = player1_score[1];
+        totalScore[2] = player1_score[2];
+        *soundEffectSlot1Init = 2;
+        player1_score[0] = 0;
+        player1_score[1] = 0;
+        player1_score[2] = 0;
+        *accumulator = 0x33;
+        render_endingUnskippable(endFrame);
+        if (*generalCounter4 != 0) {
+            do {
+                (*generalCounter4)--;
+                if (((*generalCounter4) & 0x0F) == 0x0F) {
+                    *generalCounter4 = ((*generalCounter4) & 0xF0) | 9;
+                }
+                *accumulator = *generalCounter4;
+                add100Points();
+                *soundEffectSlot1Init = 1;
+                *accumulator = 0x1;
+                render_endingUnskippable(endFrame);
+            } while (*generalCounter4 != 0);
+            *accumulator = 0x33;
+            render_endingUnskippable(endFrame);
+        }
+        if (*generalCounter5 != 0) {
+            do {
+                (*generalCounter5)--;
+                if (((*generalCounter5) & 0x0F) == 0x0F) {
+                    *generalCounter5 = ((*generalCounter5) & 0xF0) | 9;
+                }
+                *accumulator = *generalCounter5;
+                add100Points();
+                *soundEffectSlot1Init = 1;
+                *accumulator = 0x1;
+                render_endingUnskippable(endFrame);
+            } while (*generalCounter5 != 0);
+            *accumulator = 0x33;
+            render_endingUnskippable(endFrame);
+        }
+        do {
+            render_ending();
+            updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        } while (*newlyPressedButtons_player1 != 0x10);
+        *levelNumber = *player1_levelNumber;
+        score[0] = totalScore[0];
+        score[1] = totalScore[1];
+        score[2] = totalScore[2];
     }
     return 50;
 }
@@ -861,13 +946,121 @@ int render_ending() {
         }
     }
     else {
-        //btype
+        if (*levelNumber != 9) {
+            ending_typeBCathedralSetSprite();
+            (*ending_typeBCathedralFrameDelayCounter)++;
+            for (*ending_currentSprite = 0; *ending_currentSprite < *startHeight; (*ending_currentSprite)++) {
+                *generalCounter = addressSpace[0xA767 + *levelNumber];
+                if (ending_customVars[1 + *ending_currentSprite] != *generalCounter) {
+                    *spriteXOffset = ending_customVars[1 + *ending_currentSprite];
+                    ending_computeTypeBCathedralYTableIndex();
+                    *spriteYOffset = ending_typeBCathedralYTable[*registerX];
+                    loadSpriteIntoOamStaging();
+                    if (ending_typeBCathedralFrameDelayTable[*levelNumber] == *ending_typeBCathedralFrameDelayCounter) {
+                        *spriteXOffset += ending_typeBCathedralVectorTable[*levelNumber];
+                        ending_customVars[1 + *ending_currentSprite] = *spriteXOffset;
+                        ending_computeTypeBCathedralYTableIndex();
+                        if (ending_typeBCathedralXTable[*registerX] == *spriteXOffset) {
+                            ending_customVars[2 + *ending_currentSprite] = addressSpace[0xA75D + *levelNumber];
+                        }    
+                    }
+                }
+            }
+            (*ending_currentSprite)--;
+            if (ending_typeBCathedralFrameDelayTable[*levelNumber] == *ending_typeBCathedralFrameDelayCounter) {
+                *ending_typeBCathedralFrameDelayCounter = 0;
+            }
+        }
+        else {
+            int clockcycles = 9;
+            *accumulator = *player1_startHeight;
+            switch (*accumulator) {
+            case 0: clockcycles += kidIcarus(); break;
+            case 1: clockcycles += link(); break;
+            case 2: clockcycles += samus(); break;
+            case 3: clockcycles += donkeyKong(); break;
+            case 4: clockcycles += bowser(); break;
+            case 5: clockcycles += marioLuigiPeach(); break;
+            default: printf("Switch Currupted!\r\n");
+            }
+            return clockcycles;
+        }
     }
     return clockcycles + 6;
 }
 
+int ending_typeBConcertPatchToPpuForHeight() {
+    int clockcycles = 9;
+    *accumulator = *ending;
+    if (*accumulator == 6) {
+        clockcycles += 6;
+    }
+    else {
+        if (*accumulator < 6) {
+            clockcycles += 10;
+            switch (*accumulator) {
+            case 0: patchToPpuAddr[0] = 0x22; break;
+            case 1: patchToPpuAddr[0] = 0x34; break;
+            case 2: patchToPpuAddr[0] = 0x4A; break;
+            case 3: patchToPpuAddr[0] = 0x62; break;
+            case 4: patchToPpuAddr[0] = 0x7A; break;
+            case 5: patchToPpuAddr[0] = 0x96; break;
+            }
+            patchToPpuAddr[1] = 0xA8;
+        }
+        else {
+            printf("Switch Currupted!\r\n");
+        }
+    }
+    return clockcycles + 6;
+}
 
+int ending_initTypeBVars() {
+    *ending = 0;
+    *ending_customVars = 0;
+    *ending_typeBCathedralFrameDelayCounter = 0;
+    *spriteIndexInOamContentLookup = 0;
+    if (*levelNumber == 9) {
+        *ending = *player1_startHeight + 1;
+        ending_typeBConcertPatchToPpuForHeight();
+        *ending = 0;
+        ending_customVars[2] = 0;
+        ending_customVars[3] = addressSpace[0xA73D];
+        ending_customVars[4] = addressSpace[0xA73E];
+        ending_customVars[5] = addressSpace[0xA73F];
+        ending_customVars[6] = addressSpace[0xA740];
+    }
+    else {
+        ending_customVars[1] = addressSpace[0xA75D + *levelNumber];
+        ending_customVars[2] = addressSpace[0xA767 + *levelNumber];
+        ending_customVars[3] = addressSpace[0xA767 + *levelNumber];
+        ending_customVars[4] = addressSpace[0xA767 + *levelNumber];
+        ending_customVars[5] = addressSpace[0xA767 + *levelNumber];
+        ending_customVars[6] = addressSpace[0xA767 + *levelNumber];
+    }
+    return 6;
+}
 
+int add100Points() {
+    totalScore[1]++;
+    if ((totalScore[1] & 0x0F) >= 10) {
+        totalScore[1] += 6;
+        if ((totalScore[1] & 0xF0) >= 0xA0) {
+            totalScore[1] += 0x60;
+            totalScore[2]++;
+            if ((totalScore[2] & 0x0F) >= 10) {
+                totalScore[2] += 6;
+            }
+        }
+    }
+    return 6;
+}
+
+int ending_computeTypeBCathedralYTableIndex() {
+    *generalCounter = *levelNumber << 1;
+    *registerX = *ending_currentSprite + *generalCounter * 2;
+    return 32;
+}
 
 int branchOnGameMode(int (*endFrame)(), int (*endFrameNoNMI)()) {
     int clockcycles = 9;

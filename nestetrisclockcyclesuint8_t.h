@@ -113,6 +113,10 @@ int playState_receiveGarbage();
 int selectEndingScreen();
 int render_ending();
 int gameModeState_updateCountersAndNonPlayerState();
+int ending_computeTypeBCathedralYTableIndex();
+int add100Points();
+int ending_typeBConcertPatchToPpuForHeight();
+int ending_initTypeBVars();
 
 
 void mainLoop(int (*endFrame)(), int (*endFrameNoNMI)());
