@@ -111,9 +111,27 @@ int memset_ppu_page_and_more();
 int LAA82();
 int playState_receiveGarbage();
 int selectEndingScreen();
+int render_ending();
+int gameModeState_updateCountersAndNonPlayerState();
 
-int gameMode_playAndEndingHighScore();
 
+void mainLoop(int (*endFrame)(), int (*endFrameNoNMI)());
+
+
+int handleHighScoreIfNecessary(int (*endFrame)(), int (*endFrameNoNMI)());
+int highScoreEntryScreen(int (*endFrame)(), int (*endFrameNoNMI)());
+int gameModeState_handleGameOver(int (*endFrame)(), int (*endFrameNoNMI)());
+int gameModeState_startButtonHandling(int (*endFrame)());
+int gameModeState_updatePlayer1(int (*endFrame)());
+int gameModeState_updatePlayer2(int (*endFrame)());
+int gameModeState_initGameState(int(*endFrame)());
+int initPlayfieldIfTypeB(int(*endFrame)());
+int gameModeState_initGameBackground(int(*endFrame)(), int(*endFrameNoNMI)());
+int gameMode_startDemo(int (*endFrame)(), int(*endFrameNoNMI)());
+int gameMode_playAndEndingHighScore(int (*endFrame)(), int(*endFrameNoNMI)());
+int branchOnGameMode(int (*endFrame)(), int(*endFrameNoNMI)());
+int showHighScores(int(*endFrame)());
+int gameMode_levelMenu(int(*endFrame)(), int(*endFrameNoNMI)());
 int render_endingUnskippable(int(*endFrame)());
 int endingAnimation(int (*endFrame)());
 int playState_bTypeGoalCheck(int (*endFrame)());
@@ -153,8 +171,9 @@ int LE442();
 int calculate_score();
 
 
+void setCHRBanks(uint8_t* nCHRBankSelect4Lo, uint8_t* nCHRBankSelect4Hi);
 void setRegisters(uint8_t* acc, uint8_t* X, uint8_t* Y);
-void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fine_x, uint16_t* tramaddr, uint16_t* vramaddr, uint8_t* oamAddr, uint8_t* PPUCTRRegister, uint8_t* PPUMaskAddr, uint8_t* PPUStatusReg);
+void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fine_x, uint16_t* tramaddr, uint16_t* vramaddr, uint8_t* oamAddr, uint8_t* PPUCTRRegister, uint8_t* PPUMaskAddr, uint8_t* PPUStatusReg, uint8_t* tblPattern, uint8_t* tblPattern2);
 void setBaseAddressRAM();
 void setBaseAddressROM();
 void setAPURegisters(bool* channel1Disable, bool* channel2Disable, bool* noiseDisable,

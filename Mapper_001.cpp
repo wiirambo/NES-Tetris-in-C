@@ -55,12 +55,14 @@
 */
 
 #include "Mapper_001.h"
+#include "nestetrisclockcyclesuint8_t.h"
 #include <iostream>
 
 
 Mapper_001::Mapper_001(uint8_t prgBanks, uint8_t chrBanks) : Mapper(prgBanks, chrBanks)
 {
 	vRAMStatic.resize(32 * 1024);
+	setCHRBanks(&nCHRBankSelect4Lo, &nCHRBankSelect4Hi);
 }
 
 
@@ -254,7 +256,7 @@ bool Mapper_001::ppuMapRead(uint16_t addr, uint32_t &mapped_addr)
 	{
 		if (nCHRBanks == 0)
 		{
-			mapped_addr = addr;
+			mapped_addr = addr + 0x400;
 			return true;
 		}
 		else

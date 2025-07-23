@@ -708,6 +708,7 @@ void runModdedInstance() {
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/baxter-tetris-playaround.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/baxter-tetris-modeb.fm2";
 	std::string pathToSave = "C:/Program Files/fceux-2.6.3-win32/movies/Test.fm2";
+	//int speedFactor = 65536;
 	int speedFactor = 1;
 	olcNES demo(true, speedFactor, true, false, pathToMovie, pathToSave, true, false, 0);//speedfactor > 419 freezes not anymore?
 	//demo.use_game_genie_code("XTZXNX"); //disable audio 1
@@ -720,8 +721,9 @@ void runUnmoddedInstance() {
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/r57shell_archanfel-tetris-maxscore.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BuggedLevelUp.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/BType.fm2";
-	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
+	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/acmlm-tetris-fastest999999.fm2";
 	//std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/Crash Fix.fm2";
+	std::string pathToMovie = "C:/Program Files/fceux-2.6.3-win32/movies/baxter-tetris-modeb.fm2";
 	std::string pathToSave = "C:/Program Files/fceux-2.6.3-win32/movies/test.fm2";
 	olcNES demo2(true, 1, false, true, pathToMovie, pathToSave, true, false, 0);
 	//demo2.use_game_genie_code("ASAPKG");
@@ -740,7 +742,13 @@ uint8_t olc6502::JSR()
 	if (useCCode == true) {
 		uint8_t* baseAddress = getAddressSpace(0);
 		switch (addr_abs) { //cycles only counts of this instruction!!!
-		case 0x804B:cycles += render();
+		//case 0x804B:cycles += render();
+			break;
+		case 0x8161:cycles += branchOnGameMode(&olcNES::endFrame, &olcNES::endFrameNoNMI);
+			break;
+		/*case 0x81B2:cycles += branchOnPlayStatePlayer1(&olcNES::endFrame);
+			break;
+		case 0x81D9:cycles += branchOnPlayStatePlayer2(&olcNES::endFrame);
 			break;
 		case 0x829F:cycles += startButtonPressed();//never called?
 			std::cout << "start" << std::endl;
@@ -761,6 +769,8 @@ uint8_t olc6502::JSR()
 			break;
 		case 0x87C8:cycles += savePlayer1State();
 			std::cout << "save player2" << std::endl; //never called?
+			break;
+		case 0x87DC:cycles += initPlayfieldIfTypeB(&olcNES::endFrame);
 			break;
 		case 0x88AB:cycles += rotate_tetrimino();
 			break;
@@ -793,6 +803,9 @@ uint8_t olc6502::JSR()
 			break;
 		case 0x9969:cycles += incrementPieceStat();
 			break;
+
+		case 0x9CBF: std::cout << "Test" << std::endl;
+
 		case 0x9CAF:cycles += updatePlayfield();
 			setFlags();
 			break;
@@ -802,7 +815,11 @@ uint8_t olc6502::JSR()
 			break;
 		case 0x9DE8:cycles += demoButtonsTable_indexIncr();
 			break;
-		case 0x9E3A:cycles += endingAnimation(&olcNES::endFrame);
+		//case 0x9E3A:cycles += endingAnimation(&olcNES::endFrame);
+			break;
+		case 0x9FF2:cycles += showHighScores(&olcNES::endFrameNoNMI);
+			break;
+		case 0xA0EE:cycles += handleHighScoreIfNecessary(&olcNES::endFrame, &olcNES::endFrameNoNMI);
 			break;
 		case 0xA192:cycles += copyHighScoreNameToNextIndex();
 			break;
@@ -817,10 +834,10 @@ uint8_t olc6502::JSR()
 		case 0xA6BC:cycles += LA6BC();
 			break;
 		case 0xA96E:cycles += selectEndingScreen();
-			break;
+			break;*/
 		case 0xAA2F:cycles += updateAudioWaitForNmiAndResetOamStaging(&olcNES::endFrame);
 			break;
-		case 0xAA45:cycles += updateAudioAndWaitForNmi(&olcNES::endFrame);
+		/*case 0xAA45:cycles += updateAudioAndWaitForNmi(&olcNES::endFrame);
 			break;
 		case 0xAA5F:cycles += updateAudioWaitForNmiAndEnablePpuRendering(&olcNES::endFrame);
 			break;
@@ -907,7 +924,7 @@ uint8_t olc6502::JSR()
 			break;
 		case 0xEA41:cycles += musicGetNextInstructionByte();
 			setFlags();
-			break;
+			break;*/
 
 		case 0xE000:if (audioDisabled == true) {
 				//print_playfield();
@@ -949,6 +966,15 @@ uint8_t olc6502::JMP()
 {
 	if (useCCode == true) {
 		switch (addr_abs) {
+		//case 0x8138:cycles += 100; //time does not matter anymore...
+			mainLoop(&olcNES::endFrame, &olcNES::endFrameNoNMI);
+			break;
+		/*case 0x8174:cycles += gameModeState_updatePlayer1(&olcNES::endFrame);
+			unstack();
+			break;
+		case 0x8186:cycles += gameModeState_updatePlayer2(&olcNES::endFrame);
+			unstack();
+			break;
 		case 0x81CF:cycles += playState_playerControlsActiveTetrimino();
 			unstack();
 			break;
@@ -967,7 +993,19 @@ uint8_t olc6502::JMP()
 		case 0x82B1:cycles += render_mode_legal_and_title_screens();
 			unstack();
 			break;
+		case 0x83D7:cycles += gameMode_levelMenu(&olcNES::endFrame, &olcNES::endFrameNoNMI);
+			unstack();
+			break;
 		case 0x85DA:cycles += render_mode_menu_screens();
+			unstack();
+			break;
+		case 0x85F0:cycles += gameModeState_initGameBackground(&olcNES::endFrame, &olcNES::endFrameNoNMI);
+			unstack();
+			break;
+		case 0x86DC:cycles += gameModeState_initGameState(&olcNES::endFrame);
+			unstack();
+			break;
+		case 0x8884:cycles += gameModeState_updateCountersAndNonPlayerState();
 			unstack();
 			break;
 		case 0x94EE:cycles += render_mode_play_and_demo();
@@ -1012,6 +1050,14 @@ uint8_t olc6502::JMP()
 			unstack();
 			break;
 		case 0xA344:cycles += render_mode_congratulations_screen();
+			unstack();
+			setFlags();
+			break;
+		case 0xA37F:cycles += gameModeState_startButtonHandling(&olcNES::endFrame);
+			unstack();
+			setFlags();
+			break;
+		//case 0xA3F2:cycles += playState_bTypeGoalCheck(&olcNES::endFrame);
 			unstack();
 			setFlags();
 			break;
@@ -1109,7 +1155,7 @@ uint8_t olc6502::JMP()
 			break;
 		case 0xE4D1:cycles += soundEffectSlot1_levelUpPlaying();
 			unstack();
-			break;
+			break;*/
 		default: pc = addr_abs;
 		}
 

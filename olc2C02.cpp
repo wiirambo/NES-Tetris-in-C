@@ -60,7 +60,7 @@
 olc2C02::olc2C02()
 {
 	mask.reg = 0;
-	setVRAM(&vram_addr.reg, tblPalette, &fine_x, (uint16_t*)&tram_addr, (uint16_t*)&vram_addr, &oam_addr, &(control.reg), &(mask.reg), &(status.reg));
+	setVRAM(&vram_addr.reg, tblPalette, &fine_x, (uint16_t*)&tram_addr, (uint16_t*)&vram_addr, &oam_addr, &(control.reg), &(mask.reg), &(status.reg), tblPattern[0], tblPattern[1]);
 	tblName[1] = tblName1; //should be unused
 
 	palScreen[0x00] = olc::Pixel(84, 84, 84);
@@ -189,6 +189,11 @@ olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
 	// 0 0 0 0 0 0 0 0	  0 0 0 0 0 0 0 0   0 0 0 0 0 0 0 0
 	//
 	// The planes are stored as 8 bytes of LSB, followed by 8 bytes of MSB
+
+	for (int j = 0; j < 4096;j++) {
+		tblPattern[0][j] = 1;
+		tblPattern[1][j] = 1;
+	}
 
 	// Loop through all 16x16 tiles
 	for (uint16_t nTileY = 0; nTileY < 16; nTileY++)

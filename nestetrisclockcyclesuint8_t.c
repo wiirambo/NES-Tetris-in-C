@@ -225,6 +225,7 @@ uint8_t* highScoreScoresB;
 uint8_t* highScoreLevels;
 uint8_t* initMagic;
 uint8_t* defaultHighScoresTable;
+uint8_t* byteToBcdTable;
 uint8_t* stackBasePointer;
 
 //registers
@@ -329,6 +330,19 @@ uint8_t* loOff9To0FallTable;
 uint8_t* typebSuccessGraphic;
 uint8_t* rocketToXOffsetTable;
 uint8_t* rocketToSpriteTable;
+uint8_t* game_typeb_nametable_patch;
+uint8_t* typeBBlankInitCountByHeightTable;
+uint8_t* rngTable;
+uint8_t* highScoreIndexToHighScoreNamesOffset;
+uint8_t* highScoreIndexToHighScoreScoresOffset;
+uint8_t* highScoreNamePosToX;
+uint8_t* highScorePosToY;
+uint8_t* rocketToJetSpriteTable;
+uint8_t* rocketToJetXOffsetTable;
+
+//CHR Banks
+uint8_t* CHRBank0;
+uint8_t* CHRBank1;
 
 //lenght table for the APU
 uint8_t length_table[] = { 10, 254, 20,  2, 40,  4, 80,  6,
@@ -341,6 +355,8 @@ uint8_t length_table[] = { 10, 254, 20,  2, 40,  4, 80,  6,
 uint8_t* baseAddressROM;
 uint8_t* baseAddressTBL;
 uint8_t* tablePalette;
+uint8_t* tablePattern;
+uint8_t* tablePattern2;
 
 //the NES Addressspace
 uint8_t* addressSpaces[4]; //currently not used; intendet to for running multiple instances in seperate threads
@@ -412,6 +428,11 @@ void apply_game_genie_code(const char code[], int characters) {//source of infor
     addressSpace[address] = (uint8_t)data;
 }
 
+void setCHRBanks(uint8_t* nCHRBankSelect4Lo, uint8_t* nCHRBankSelect4Hi) {
+    CHRBank0 = nCHRBankSelect4Lo;
+    CHRBank1 = nCHRBankSelect4Hi;
+}
+
 void setAPURegisters(bool* channel1Disable, bool* channel2Disable, bool* noiseDisable,
                     uint16_t* channel1Vol, uint16_t* channel2Vol, uint16_t* noiseVol,
                     uint32_t* channel1Seq, uint32_t* channel2Seq, uint16_t* noiseRel,
@@ -474,6 +495,8 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     rocketToXOffsetTable = addressSpace + 0xAA25;
     demoTetriminoTypeTable = addressSpace + 0xDF00;
     spawnOrientationFromOrientation = addressSpace + 0x9956;
+    game_typeb_nametable_patch = addressSpace + 0x86B0;
+    rngTable = addressSpace + 0x887C;
     oamContentLookup = addressSpace + 0x8C6C;
     orientationToSpriteTable = addressSpace + 0x8BE5;
     colorTable = addressSpace + 0x984C;
@@ -483,6 +506,11 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     rightColumns = addressSpace + 0x9803;
     highScorePpuAddrTable = addressSpace + 0xA086;
     highScoreCharToTile = addressSpace + 0xA08C;
+    byteToBcdTable = addressSpace + 0xA0BC;
+    highScoreIndexToHighScoreNamesOffset = addressSpace + 0xA1F1;
+    highScoreIndexToHighScoreScoresOffset = addressSpace + 0xA1F9;
+    highScorePosToY = addressSpace + 0xA33B;
+    highScoreNamePosToX = addressSpace + 0xA33E;
     ending_typeBCathedralAnimSpeed = addressSpace + 0xA749;
     ending_typeBCathedralSpriteTable = addressSpace + 0xA7F3;
     LA735 = addressSpace + 0xA735;
@@ -495,10 +523,13 @@ void setBaseAddressROM() {//baseAddress = 0x8000
     luigiFrameToYOffsetTable = addressSpace + 0xA80E;
     luigiFrameToSpriteTable = addressSpace + 0xA818;
     rocketToSpriteTable = addressSpace + 0xAA11;
+    rocketToJetSpriteTable = addressSpace + 0xAA16;
+    rocketToJetXOffsetTable = addressSpace + 0xAA20;
     levelToSpriteYOffset = addressSpace + 0x85B2;
     levelToSpriteXOffset = addressSpace + 0x85BC;
     heightToPpuLowAddr = addressSpace + 0x85C6;
     heightToPpuHighAddr = addressSpace + 0x85CC;
+    typeBBlankInitCountByHeightTable = addressSpace + 0x8876;
     levelDisplayTable = addressSpace + 0x96B8;
     pieceToPpuStatAddr = addressSpace + 0x96AA;
     defaultHighScoresTable = addressSpace + 0xAD67;
@@ -528,7 +559,7 @@ void setRegisters(uint8_t* acc, uint8_t* X, uint8_t* Y) {
     registerY = Y;
 }
 
-void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fineX, uint16_t* tramaddr, uint16_t* vramaddr, uint8_t* oamAddr, uint8_t* PPUCTRRegister, uint8_t* PPUMaskAddr, uint8_t* PPUStatusReg) {
+void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fineX, uint16_t* tramaddr, uint16_t* vramaddr, uint8_t* oamAddr, uint8_t* PPUCTRRegister, uint8_t* PPUMaskAddr, uint8_t* PPUStatusReg, uint8_t *tblPattern, uint8_t* tblPattern2) {
     PPUADDR = ppuaddr;
     tablePalette = tblPalette;
     fine_x = fineX;
@@ -538,6 +569,8 @@ void setVRAM(uint16_t* ppuaddr, uint8_t* tblPalette, uint8_t* fineX, uint16_t* t
     PPUControlRegister = PPUCTRRegister;
     PPUMASK = PPUMaskAddr;
     PPUSTATUS = PPUStatusReg;
+    tablePattern = tblPattern;
+    tablePattern2 = tblPattern2;
 }
 
 void setBaseAddressRAM() {
@@ -745,28 +778,135 @@ void setBaseAddressRAM() {
     highScoreLevels = addressSpace + 0x0748;
     initMagic = addressSpace + 0x0750;
 }
+    
 
-int gameMode_playAndEndingHighScore() {
+int endingAnimation(int (*endFrame)()) {
+    *spriteIndexInOamContentLookup = 2;
+    *renderMode = 4;
+    if (*gameType == 0) { //must be set to 0 to fix it later
+
+        updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+        disableNmi();
+        *accumulator = 2;
+        changeCHRBank0();
+        *accumulator = 2;
+        changeCHRBank1();
+
+        bulkCopyToPpu(0xF7, 0xA939, endFrame);
+        bulkCopyToPpu(0xF7, 0xA93E, endFrame);
+
+        selectEndingScreen();
+        waitForVBlankAndEnableNmi(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        *renderMode = 4;
+        setMusicTrack(10);
+        *accumulator = 0x33;
+        render_endingUnskippable(endFrame);
+        do {
+            render_ending();
+            updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        } while (ending_customVars[0] != 0 || *newlyPressedButtons_player1 != 0x10);
+    }
+    else {
+        /*bulkCopyToPpu(0xF7, 0xC9A6, endFrame);
+        bulkCopyToPpu(0xF7, 0xAD43, endFrame);
+
+        waitForVBlankAndEnableNmi(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        endFrame();
+        endFrame();
+        endFrame();
+        endFrame();*/
+
+    }
+    return 50;
+}
+
+int render_ending() {
+    int clockcycles = 5;
+    if (*gameType == 0) {
+        if (*ending_customVars != 0) {
+            *spriteYOffset = *ending_customVars;
+            *spriteXOffset = rocketToXOffsetTable[*ending];
+            *spriteIndexInOamContentLookup = rocketToSpriteTable[*ending];
+            clockcycles += loadSpriteIntoOamStaging();
+            *generalCounter = *ending << 1;
+            *registerX = ((*frameCounter & 2) >> 1) + *generalCounter;
+            *spriteIndexInOamContentLookup = rocketToJetSpriteTable[*registerX];
+            *spriteXOffset += rocketToJetXOffsetTable[*ending];
+            loadSpriteIntoOamStaging();
+            if (ending_customVars[1] == 0xF0) {
+                if (ending_customVars[0] < 0xB0) {
+                    if ((*frameCounter & 1) == 0) {
+                        return clockcycles + 12;
+                    }
+                }
+                *soundEffectSlot0Init = 3;
+                ending_customVars[0]--;
+                if (ending_customVars[0] >= 0x80) {
+                    ending_customVars[0]--;
+                }
+            }
+            else {
+                ending_customVars[1]++;
+                clockcycles += 6;
+            }
+        }
+        else {
+            clockcycles += 1;
+        }
+    }
+    else {
+        //btype
+    }
+    return clockcycles + 6;
+}
+
+
+
+
+int branchOnGameMode(int (*endFrame)(), int (*endFrameNoNMI)()) {
     int clockcycles = 9;
-    /*accumulator = *gameModeState;
+    *accumulator = *gameMode;
     switch (*accumulator) {
-        case 0: clockcycles += gameModeState_initGameBackground(); break;
-        case 1: clockcycles += gameModeState_initGameState(); break;
+        case 0: clockcycles += gamemode_legalScreen(endFrame); break;
+        case 1: clockcycles += gameMode_titleScreen(endFrame); break;
+        case 2: clockcycles += gameMode_gameTypeMenu(endFrame, endFrameNoNMI); break;
+        case 3: clockcycles += gameMode_levelMenu(endFrame, endFrameNoNMI); break;
+        case 4: clockcycles += gameMode_playAndEndingHighScore(endFrame, endFrameNoNMI); break;
+        case 5: clockcycles += gameMode_playAndEndingHighScore(endFrame, endFrameNoNMI); break;
+        case 6: clockcycles += gameMode_startDemo(endFrame, endFrameNoNMI); break;
+        default: printf("Switch Currupted!\r\n");
+    }
+    return clockcycles;
+}
+
+
+int gameMode_playAndEndingHighScore(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    int clockcycles = 9;
+    *accumulator = *gameModeState;
+    switch (*accumulator) {
+        case 0: clockcycles += gameModeState_initGameBackground(endFrame, endFrameNoNMI); break;
+        case 1: clockcycles += gameModeState_initGameState(endFrame); break;
         case 2: clockcycles += gameModeState_updateCountersAndNonPlayerState(); break;
-        case 3: clockcycles += gameModeState_handleGameOver(); break;
-        case 4: clockcycles += gameModeState_updatePlayer1(); break;
-        case 5: clockcycles += gameModeState_updatePlayer2(); break;
+        case 3: clockcycles += gameModeState_handleGameOver(endFrame, endFrameNoNMI); break;
+        case 4: clockcycles += gameModeState_updatePlayer1(endFrame); break;
+        case 5: clockcycles += gameModeState_updatePlayer2(endFrame); break;
         case 6: clockcycles += gameModeState_checkForResetKeyCombo(); break;
-        case 7: clockcycles += gameModeState_startButtonHandling(); break;
+        case 7: clockcycles += gameModeState_startButtonHandling(endFrame); break;
         case 8: clockcycles += gameModeState_vblankThenRunState2(); break;
     default: printf("Switch Currupted!\r\n");
-    }*/
+    }
     return clockcycles;
 }
 
 int branchOnPlayStatePlayer1(int (*endFrame)()) {
     int clockcycles = 9;
-    *accumulator = *gameModeState;
+    *accumulator = *playState;
     switch (*accumulator) {
     case 0: clockcycles += playState_unassignOrientationId(); break;
     case 1: clockcycles += playState_playerControlsActiveTetrimino(); break;
@@ -787,7 +927,7 @@ int branchOnPlayStatePlayer1(int (*endFrame)()) {
 
 int branchOnPlayStatePlayer2(int (*endFrame)()) {
     int clockcycles = 9;
-    *accumulator = *gameModeState;
+    *accumulator = *playState;
     switch (*accumulator) {
     case 0: clockcycles += playState_unassignOrientationId(); break;
     case 1: clockcycles += playState_playerControlsActiveTetrimino(); break;
@@ -806,73 +946,686 @@ int branchOnPlayStatePlayer2(int (*endFrame)()) {
     return clockcycles;
 }
 
+#include <time.h>
+
+clock_t end;
+clock_t start;
+
+void mainLoop(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    start = clock();
+    while (true) { //game vever stops; there is no hard reset or power of implemented
+        if (frameCounter[0] == 0xFF && frameCounter[1] == 0xFF) {
+            //print_playfield();
+        }
+        branchOnGameMode(endFrame, endFrameNoNMI);
+        if (*accumulator == *gameModeState) {
+            updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        }
+        if (*gameMode == 5) {
+            if (demoButtonsAddr[1] != 0xDF) {
+                demoButtonsAddr[1] = 0xDD;
+                frameCounter[1] = 0;
+                *gameMode = 1;
+            }
+        }
+    }
+}
+
 int playState_updateGameOverCurtain(int (*endFrame)()) {
     int clockcycles = 7;
     if (*curtainRow != 0x14) {
+        if ((*frameCounter & 3) == 0) {
+            if (((int8_t)*curtainRow) >= 0) {
+                *registerY = multBy10Table[*curtainRow];
+                *generalCounter3 = 0;
+                *currentPiece = 0x13;
+                do {
+                    playfield[*registerY] = 0x4F;
+                    (*registerY)++;
+                    (*generalCounter3)++;
+                } while (*generalCounter3 < 10);
+                *vramRow = *curtainRow;
+            }
+            else {
+                clockcycles += 1;
+            }
+            (*curtainRow)++;
+        }
+        else {
+            clockcycles += 1;
+        }
     }
     else {
+        if (*numberOfPlayers != 2) {
+            if (player1_score[2] >= 3) {
+                for (int i = 0; i < 0x66; i++) {
+                    endFrame();
+                }
+                endingAnimation(endFrame);
+                *playState = 0;
+                *newlyPressedButtons_player1 = 0;
+            }
+            else {
+                if (*newlyPressedButtons_player1 == 0x10) {
+                    *playState = 0;
+                    *newlyPressedButtons_player1 = 0;
+                }
+            }
+        }
+        else {
+            *playState = 0;
+            *newlyPressedButtons_player1 = 0;
+        }
         clockcycles += 1;
     }
     return clockcycles + 6;
 }
 
-int endingAnimation(int (*endFrame)()) {
-    *spriteIndexInOamContentLookup = 2;
-    *renderMode = 4;
-    if (*gameType == 0) {
-        updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
-        disableNmi();
-        changeCHRBank0();
-        changeCHRBank1();
-        bulkCopyToPpu(0xF9, 0xD267, endFrame);
-        bulkCopyToPpu(0xF9, 0xAD42, endFrame);
-        selectEndingScreen();
-        waitForVBlankAndEnableNmi(endFrame);
-        updateAudioWaitForNmiAndResetOamStaging(endFrame);
-        updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
-        updateAudioWaitForNmiAndResetOamStaging(endFrame);
-        *renderMode = 4;
-        setMusicTrack(10);
-        *accumulator = 0x33;
-        //render_endingUnskippable(endFrame);
-    }
-    else {
-    
-    }
-    return 50;
-}
-
-int renderEnding() {
-    int clockcyles = 5;
-    if (*gameType == 0) {
-        if (*ending_customVars != 0) {
-            *spriteYOffset = *ending_customVars;
-            *spriteXOffset = rocketToXOffsetTable[*ending];
-            *spriteIndexInOamContentLookup = rocketToSpriteTable[*ending];
-        }
-        else {
-            clockcyles += 1;
-        }
-    }
-    else {
-        //btype
-    }
-    return clockcyles + 6;
-}
-
 int render_endingUnskippable (int(*endFrame)()) {
     *sleepCounter = *accumulator;
     do {
-        renderEnding();
+        render_ending();
         updateAudioWaitForNmiAndResetOamStaging(endFrame);
     } while (*sleepCounter != 0);
     return 15;
 }
 
+int gameMode_startDemo(int(*endFrame)(), int(*endFrameNoNMI)()) {
+    *gameType = 0;
+    *player1_startLevel = 0;
+    *gameModeState = 0;
+    *player1_playState = 0;
+    *gameMode = 5;
+    gameMode_playAndEndingHighScore(endFrame, endFrameNoNMI);
+    return 6;
+}
+
+int gameModeState_updatePlayer1(int (*endFrame)()) {
+    int clockcycles = 25;
+    clockcycles += makePlayer1Active();
+    clockcycles += branchOnPlayStatePlayer1(endFrame);
+    clockcycles += stageSpriteForCurrentPiece();
+    clockcycles += savePlayer1State();
+    clockcycles += stageSpriteForNextPiece();
+    (*gameModeState)++;
+    return clockcycles + 6;
+}
+int gameModeState_updatePlayer2(int (*endFrame)()) {
+    int clockcycles = 7;
+    if (*numberOfPlayers == 2) {
+        clockcycles += 24;
+        clockcycles += makePlayer2Active();
+        clockcycles += branchOnPlayStatePlayer2(endFrame);
+        clockcycles += stageSpriteForCurrentPiece();
+        clockcycles += savePlayer2State();
+    }
+    else {
+        clockcycles += 1;
+    }
+    (*gameModeState)++;
+    return clockcycles + 6;
+}
+
+
+
+
+
+
+int gameModeState_handleGameOver(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    *generalCounter2 = 5;
+    if (*player1_playState != 0) {
+        if (*numberOfPlayers == 1) {
+            (*gameModeState)++;
+            return 6;
+        }
+        else {
+            *generalCounter2 = 4;
+            if (*player2_playState != 0) {
+                (*gameModeState)++;
+                return 6;
+            }
+        }
+        
+    }
+    if (*numberOfPlayers != 1) {
+        *gameModeState = 9;
+    }
+    else {
+        *renderMode = 3;
+        if (*numberOfPlayers == 1) { //always the case?
+            handleHighScoreIfNecessary(endFrame, endFrameNoNMI);
+        }
+        *player1_playState = 1;
+        *player2_playState = 1;
+        *registerX = 4;
+        *registerY = 5;
+        *accumulator = 0xEF;
+        memset_page();
+        *player1_vramRow = 0;
+        *player2_vramRow = 0;
+        *player1_playState = 1; //is set twice?
+        *player2_playState = 1; //is set twice?
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+        *gameMode = 3;
+    }
+    int clockcycles = 0;
+    return clockcycles + 6;
+}
+
+int highScoreEntryScreen(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    setMMC1Control();
+    setMusicTrack(9);
+    *renderMode = 2;
+    updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    disableNmi();
+    *accumulator = 0;
+    changeCHRBank0();
+    *accumulator = 0;
+    changeCHRBank1();
+    bulkCopyToPpu(0xF9, 0xA225, endFrameNoNMI);
+    bulkCopyToPpu(0xF9, 0xA22A, endFrameNoNMI);
+    *PPUADDR = 0x20 << 8;
+    *PPUADDR |= 0x6D;
+    baseAddressTBL[*PPUADDR & 0x3FF] = 10 + *gameType;
+    showHighScores(endFrameNoNMI);
+    *renderMode = 2;
+    waitForVBlankAndEnableNmi(endFrame);//endFrameNoNMI?
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    *generalCounter = *highScoreEntryRawPos << 1;
+    *highScoreEntryNameOffsetForRow = *highScoreEntryRawPos * 6;
+    *highScoreEntryNameOffsetForLetter = 0;
+    *oamStaging = 0;
+    *spriteYOffset = highScorePosToY[*highScoreEntryRawPos & 3];
+    while (true) {
+        *oamStaging = 0;
+        *spriteXOffset = highScoreNamePosToX[*highScoreEntryNameOffsetForLetter];
+        *spriteIndexInOamContentLookup = 0x0E;
+        if ((*frameCounter & 1) == 0) {
+            *spriteIndexInOamContentLookup = 2;
+        }
+        loadSpriteIntoOamStaging();
+        if ((*newlyPressedButtons_player1 & 0x10) != 0) {
+            *soundEffectSlot1Init = 2;
+            break;
+        }
+        else {
+            if ((*newlyPressedButtons_player1 & 0x81) != 0) {
+                *soundEffectSlot1Init = 1;
+                (*highScoreEntryNameOffsetForLetter)++;
+                if (*highScoreEntryNameOffsetForLetter == 6) {
+                    *highScoreEntryNameOffsetForLetter = 0;
+                }
+            }
+            if ((*newlyPressedButtons_player1 & 0x42) != 0) {
+                *soundEffectSlot1Init = 1;
+                (*highScoreEntryNameOffsetForLetter)--;
+                if (((int8_t)*highScoreEntryNameOffsetForLetter) < 0) {
+                    *highScoreEntryNameOffsetForLetter = 5;
+                }
+            }
+            if ((*heldButtons_player1 & 4) != 0) {
+                if ((*frameCounter & 7) == 0) {
+                    *soundEffectSlot1Init = 1;
+                    *generalCounter = *highScoreEntryNameOffsetForRow;
+                    *registerX = *generalCounter + *highScoreEntryNameOffsetForLetter;
+                    *generalCounter = highScoreNames[*registerX];
+                    (*generalCounter)--;
+                    if (((int8_t)*generalCounter) < 0) {
+                        *generalCounter += 0x2C;
+                    }
+                    highScoreNames[*registerX] = *generalCounter;
+                }
+            }
+            if ((*heldButtons_player1 & 8) != 0) {
+                if ((*frameCounter & 7) == 0) {
+                    *soundEffectSlot1Init = 1;
+                    *generalCounter = *highScoreEntryNameOffsetForRow;
+                    *registerX = *generalCounter + *highScoreEntryNameOffsetForLetter;
+                    *generalCounter = highScoreNames[*registerX];
+                    (*generalCounter)++;
+                    if (((int8_t)*generalCounter) >= 0x2C) {
+                        *generalCounter -= 0x2C;
+                    }
+                    highScoreNames[*registerX] = *generalCounter;
+                }
+            }
+
+        }
+        *highScoreEntryCurrentLetter = highScoreNames[*highScoreEntryNameOffsetForRow + *highScoreEntryNameOffsetForLetter];
+        *outOfDateRenderFlags = 0x80;
+        updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    }
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    int clockcycles = 0;
+    return clockcycles + 6;
+}
+
+int handleHighScoreIfNecessary(int (*endFrame)(), int (*endFrameNoNMI)()) {
+    int clockcycles = 0;
+    bool adjustHighScores = false;
+    *highScoreEntryRawPos = 0;
+    if (*gameType != 0) {
+        *highScoreEntryRawPos = 4;
+    }
+    do {
+        *generalCounter2 = *highScoreEntryRawPos;
+        *registerY = *highScoreEntryRawPos * 3;
+        if (highScoreScoresA[*registerY] < player1_score[2]) {
+            adjustHighScores = true;
+            break;
+        }
+        else {
+            if (highScoreScoresA[*registerY] == player1_score[2]) {
+                (*registerY)++;
+                if (highScoreScoresA[*registerY] < player1_score[1]) {
+                    adjustHighScores = true;
+                    break;
+                }
+                else {
+                    if (highScoreScoresA[*registerY] == player1_score[1]) {
+                        (*registerY)++;
+                        if (highScoreScoresA[*registerY] <= player1_score[0]) {
+                            adjustHighScores = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        (*highScoreEntryRawPos)++;
+    } while ((*highScoreEntryRawPos != 3) && (*highScoreEntryRawPos != 7));
+    if (adjustHighScores == true) {
+        if ((*highScoreEntryRawPos & 3) < 2) {
+            *accumulator = 6;
+            copyHighScoreNameToNextIndex();
+            *accumulator = 3;
+            copyHighScoreScoreToNextIndex();
+            *accumulator = 1;
+            copyHighScoreLevelToNextIndex();
+            if ((*highScoreEntryRawPos & 3) == 0) {
+                *accumulator = 0;
+                copyHighScoreNameToNextIndex();
+                *accumulator = 0;
+                copyHighScoreScoreToNextIndex();
+                *accumulator = 0;
+                copyHighScoreLevelToNextIndex();
+            }
+        }
+        *accumulator = 0;
+        *registerY = 6;
+        *registerX = highScoreIndexToHighScoreNamesOffset[*highScoreEntryRawPos];
+        do {
+            highScoreNames[*registerX] = 0;
+            (*registerX)++;
+            (*registerY)--;
+
+        } while (*registerY != 0);
+        *registerX = highScoreIndexToHighScoreScoresOffset[*highScoreEntryRawPos];
+        highScoreScoresA[*registerX] = player1_score[2];
+        (*registerX)++;
+        highScoreScoresA[*registerX] = player1_score[1];
+        (*registerX)++;
+        highScoreScoresA[*registerX] = player1_score[0];
+        highScoreLevels[*highScoreEntryRawPos] = *player1_levelNumber;
+        highScoreEntryScreen(endFrame, endFrameNoNMI);
+    }
+    return clockcycles + 6;
+}
+
+int gameModeState_startButtonHandling(int (*endFrame)()) {
+    int clockcycles = 0;
+    if (*gameMode == 5 && *newlyPressedButtons_player1 == 0x10) {
+        *gameMode = 1;
+    }
+    else {
+        if (*renderMode == 3 && (*newlyPressedButtons_player1 & 0x10) != 0) {
+            if (*player1_playState != 10) {
+                *musicStagingNoiseHi = 5;
+                *renderMode = 0;
+                updateAudioAndWaitForNmi(endFrame);
+                *PPUMASK = 0x16;
+                *accumulator = 0xFF;
+                *registerX = 0x2;
+                *registerY = 0x2;
+                memset_page();
+
+                while (true) {
+                    *spriteXOffset = 0x70;
+                    *spriteXOffset = 0x77;
+                    *spriteIndexInOamContentLookup = 5;
+                    loadSpriteIntoOamStaging();
+                    if (*newlyPressedButtons_player1 == 0x10) {
+                        break;
+                    }
+                    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+                }
+                *PPUMASK = 0x1E;
+                *musicStagingNoiseHi = 0;
+                *player1_vramRow = 0;
+                *renderMode = 3;
+            }
+        }
+    }
+    (*gameModeState)++;
+    return clockcycles + 6;
+}
+
+int gameModeState_updateCountersAndNonPlayerState() {
+    int clockcycles = 8;
+    *accumulator = 3;
+    clockcycles += changeCHRBank0();
+    clockcycles += 8;
+    *accumulator = 3;
+    clockcycles += changeCHRBank1();
+    *accumulator = 0;
+    clockcycles += 20;
+    *oamStagingLength = 0;
+    (*player1_fallTimer)++;
+    (*player2_fallTimer)++;
+    if (*twoPlayerPieceDelayCounter != 0) {
+        clockcycles += 5;
+        (*twoPlayerPieceDelayCounter)++;
+    }
+    clockcycles += 5;
+    if ((*newlyPressedButtons_player1 &  0x20) != 0) {
+        *displayNextPiece = *displayNextPiece ^ 1;
+    }
+    clockcycles += 5;
+    (*gameModeState)++;
+    return clockcycles + 6;
+}
+
+int gameModeState_initGameState(int(*endFrame)()) {
+    *accumulator = 0xEF;
+    *registerX = 4;
+    *registerY = 4;
+    memset_page();
+    *registerX = 0x0F;
+    *accumulator = 0;
+    for (uint8_t i = 0; i < 16; i++) {
+        statsByType[i] = 0;
+    }
+    *player1_tetriminoX = 5;
+    *player1_tetriminoX = 5;
+
+    *player1_tetriminoY = 0;
+    *player2_tetriminoY = 0;
+    *player1_vramRow = 0;
+    *player2_vramRow = 0;
+    *player1_fallTimer = 0;
+    *player2_fallTimer = 0;
+    *pendingGarbage = 0;
+    *pendingGarbageInactivePlayer = 0;
+    player1_score[0] = 0;
+    player1_score[1] = 0;
+    player1_score[2] = 0;
+    player2_score[0] = 0;
+    player2_score[1] = 0;
+    player2_score[2] = 0;
+    player1_lines[0] = 0;
+    player1_lines[1] = 0;
+    player2_lines[0] = 0;
+    player2_lines[1] = 0;
+    *twoPlayerPieceDelayCounter = 0;
+    lineClearStatsByType[0] = 0;
+    lineClearStatsByType[1] = 0;
+    lineClearStatsByType[2] = 0;
+    lineClearStatsByType[3] = 0;
+    *allegro = 0;
+    *demo_heldButtons = 0;
+    *demo_repeats = 0;
+    *demoIndex = 0;
+    *demoButtonsAddr = 0;
+    *spawnID = 0;
+
+
+    demoButtonsAddr[1] = 0xDD;
+    *renderMode = 3;
+    *player1_autorepeatY = 0xB4;
+    *player2_autorepeatY = 0xB4;
+    chooseNextTetrimino();
+    *player1_currentPiece = *accumulator;
+    *player2_currentPiece = *accumulator;
+    incrementPieceStat();
+    generateNextPseudorandomNumber();
+    chooseNextTetrimino();
+    *nextPiece = *accumulator;
+    *twoPlayerPieceDelayPiece = *accumulator;
+    if (*gameType == 1) {
+        *player1_lines = 0x25;
+        *player2_lines = 0x25;
+    }
+    *outOfDateRenderFlags = 0x47;
+    int clockcycles = updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    initPlayfieldIfTypeB(endFrame);
+    setMusicTrack(musicSelectionTable[*musicType]);
+    (*gameModeState)++;
+    clockcycles += 13;
+    return clockcycles + 6; //only sometimes ends the frame B-Type!
+}
+
+int gameModeState_initGameBackground(int(*endFrame)(), int(*endFrameNoNMI)()) {
+    updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    disableNmi();
+    *currentPpuCtrl = 0x98;
+    *PPUControlRegister = 0x98;
+    *tram_addr = *vram_addr;
+    *accumulator = 3;
+    changeCHRBank0();
+    *accumulator = 3;
+    changeCHRBank1();
+    bulkCopyToPpu(0xFB, 0x8603, endFrame);
+    bulkCopyToPpu(0xFB, 0x8608, endFrame);
+    *PPUADDR = 0x20 << 8;
+    *PPUADDR |= 0x83;
+    if (*gameType == 0) {
+        baseAddressTBL[*PPUADDR & 0x3FF] = 10;
+        *PPUADDR = 0x20 << 8;
+        *PPUADDR |= 0xB8;
+        *accumulator = highScoreScoresA[0];
+        twoDigsToPPU();
+        *accumulator = highScoreScoresA[1];
+        twoDigsToPPU();
+        *accumulator = highScoreScoresA[2];
+        twoDigsToPPU();
+    }
+    else {
+        baseAddressTBL[*PPUADDR & 0x3FF] = 11;
+        *PPUADDR = 0x20 << 8;
+        *PPUADDR |= 0xB8;
+        *accumulator = highScoreScoresB[0];
+        twoDigsToPPU();
+        *accumulator = highScoreScoresB[1];
+        twoDigsToPPU();
+        *accumulator = highScoreScoresB[2];
+        twoDigsToPPU();
+        *registerX = 0;
+
+
+        *PPUADDR = game_typeb_nametable_patch[*registerX] << 8;
+        (*registerX)++;
+        *PPUADDR |= game_typeb_nametable_patch[*registerX];
+        (*registerX)++;
+
+        while (true) {
+            *accumulator = game_typeb_nametable_patch[*registerX];
+            (*registerX)++;
+
+            if (*accumulator != 0xFE) {
+                if (*accumulator != 0xFD) {
+                    baseAddressTBL[*PPUADDR & 0x3FF] = *accumulator;
+                    (*PPUADDR)++;
+                }
+                else {
+                    break;
+                }
+            }
+            else {
+                *PPUADDR = game_typeb_nametable_patch[*registerX] << 8;
+                (*registerX)++;
+                *PPUADDR |= game_typeb_nametable_patch[*registerX];
+                (*registerX)++;
+            }
+        }
+
+        *PPUADDR = 0x23 << 8;
+        *PPUADDR |= 0x3B;
+        baseAddressTBL[*PPUADDR & 0x3FF] = *startHeight & 0xF;
+    }
+    waitForVBlankAndEnableNmi(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    int clockcycles = updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    clockcycles += 26;
+    *player1_playState = 1;
+    *player2_playState = 1;
+    *player1_levelNumber = *player1_startLevel;
+    *player2_levelNumber = *player2_startLevel;
+    (*gameModeState)++;
+    return clockcycles + 6;
+}
+
+int gameMode_levelMenu(int(*endFrame)(), int(*endFrameNoNMI)()) {
+    //printf("gameMode_levelMenu\r\n");
+    setMMC1Control();
+    updateAudio2();
+    *renderMode = 1;
+    updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
+    disableNmi();
+    *accumulator = 0;
+    changeCHRBank0();
+    *accumulator = 0;
+    changeCHRBank1();
+    bulkCopyToPpu(0xFD, 0x83FE, endFrameNoNMI);
+    bulkCopyToPpu(0xFD, 0x83F9, endFrameNoNMI);
+    if (*gameType != 1) {
+        bulkCopyToPpu(0xFD, 0x8407, endFrameNoNMI);
+    }
+    showHighScores(endFrameNoNMI);
+    waitForVBlankAndEnableNmi(endFrameNoNMI);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    *ppuScrollY = 0;
+    *ppuScrollX = 0;
+    updateAudioWaitForNmiAndEnablePpuRendering(endFrame);
+    updateAudioWaitForNmiAndResetOamStaging(endFrame);
+    *originalY = 0;
+    *dropSpeed = 0;
+    while (*player1_startLevel >= 10) {
+        *player1_startLevel -= 10;
+    }
+    while (true) {
+        *activePlayer = 0;
+        *startLevel = *player1_startLevel;
+        *startHeight = *player1_startHeight;
+        *selectingLevelOrHeight = *originalY;
+        *newlyPressedButtons = *newlyPressedButtons_player1;
+        gameMode_levelMenu_handleLevelHeightNavigation();
+        *player1_startLevel = *startLevel;
+        *player1_startHeight = *startHeight;
+
+        *originalY = *selectingLevelOrHeight;
+        if (*newlyPressedButtons_player1 == 0x10) {
+            if (*heldButtons_player1 == 0x90) {
+                *player1_startLevel += 10;
+            }
+            *gameModeState = 0;
+            *soundEffectSlot1Init = 2;
+            (*gameMode)++;
+            return 6;//after NIM not figured out yet
+        }
+        else {
+            if (*newlyPressedButtons_player1 == 0x40) {
+                *soundEffectSlot1Init = 2;
+                (*gameMode)--;
+                return 6;//after NIM not figured out yet
+            }
+            else {
+                do {
+                    generateNextPseudorandomNumber();
+                    *accumulator = *rng_seed & 0xF;
+                } while (*accumulator >= 10);
+                *player1_garbageHole = *accumulator;
+                do {
+                    generateNextPseudorandomNumber();
+                    *accumulator = *rng_seed & 0xF;
+                } while (*accumulator >= 10);
+                *player2_garbageHole = *accumulator;
+                updateAudioWaitForNmiAndResetOamStaging(endFrame);
+            }
+        }
+    }
+    int clockcycles = 0; //after NIM not figured out yet
+    return clockcycles + 6;
+}
+
+int showHighScores(int(*endFrame)()) {
+    int clockcycles = 8;
+    if (*numberOfPlayers == 1) {
+        bulkCopyToPpu(0xFB, 0x9FFE, endFrame);
+        clockcycles += 8;
+        *generalCounter2 = 0;
+        if (*gameType == 1) {
+            clockcycles += 6;
+            *generalCounter2 = 4;
+        }
+        do {
+            clockcycles += 50;
+            *registerX = (*generalCounter2 & 3) << 1;
+            *PPUADDR = highScorePpuAddrTable[*registerX] << 8;
+            (*registerX)++;
+            *PPUADDR |= highScorePpuAddrTable[*registerX];
+            *generalCounter = *generalCounter2 << 1;
+            *registerY = *generalCounter + (*generalCounter << 1);
+            *registerX = 6;
+            do{
+                *accumulator = highScoreNames[*registerY];
+                *generalCounter = *registerY;
+                *registerY = *accumulator;
+                *accumulator = highScoreCharToTile[*registerY];
+                *registerY = *generalCounter;
+                baseAddressTBL[*PPUADDR & 0x3FF] = *accumulator;            
+                (*PPUADDR)++;
+                clockcycles += 30;
+                (*registerY)++;
+                (*registerX)--;
+            } while (*registerX != 0);
+            baseAddressTBL[*PPUADDR & 0x3FF] = 0xFF;
+            (*PPUADDR)++;
+            clockcycles += 26;
+            *generalCounter = *generalCounter2;
+            *registerY = *generalCounter + (*generalCounter << 1);
+            *accumulator = highScoreScoresA[*registerY];
+            clockcycles += twoDigsToPPU();
+            clockcycles += 15;
+            (*registerY)++;
+            *accumulator = highScoreScoresA[*registerY];
+            clockcycles += twoDigsToPPU();
+            clockcycles += 15;
+            (*registerY)++;
+            *accumulator = highScoreScoresA[*registerY];
+            clockcycles += twoDigsToPPU();
+            clockcycles += 25;
+            baseAddressTBL[*PPUADDR & 0x3FF] = 0xFF;
+            (*PPUADDR)++;
+            *registerX = highScoreLevels[*generalCounter2];
+            *accumulator = byteToBcdTable[*registerX];
+            clockcycles += twoDigsToPPU();
+            (*generalCounter2)++;
+            clockcycles += 11;
+        } while (*generalCounter2  != 3 && *generalCounter2 != 7);
+    }
+    else {
+        clockcycles += 6;
+    }
+    return clockcycles + 6;
+}
+
 int playState_bTypeGoalCheck(int (*endFrame)()) {
     int clockcycles = 6;
     if (*gameType != 0) {
-        if (*lines != 0) {
+        if ((int8_t)(*lines) <= 0) {
             clockcycles += 12;
             setMusicTrack(*accumulator);
             *registerY = 0x46;
@@ -972,7 +1725,7 @@ int copyAddrAtReturnAddressToTmp_incrReturnAddrBy2() {
 int counter2 = 1;
 
 int bulkCopyToPpu(uint8_t stackPointer, uint16_t PC, int(*endFrame)()) {
-    //printf("PC: %0x SP: %0x ", PC,(int)stackPointer);
+    //printf("PC: %0x SP: %0x \r\n", PC,(int)stackPointer);
     int clockcycles = 0;
     PC--;
     addressSpace[0x0100 + stackPointer] = (PC >> 8) & 0x00FF;
@@ -1061,6 +1814,7 @@ int bulkCopyToPpu(uint8_t stackPointer, uint16_t PC, int(*endFrame)()) {
                     }
                     else {
                         baseAddressTBL[*PPUADDR & 0x3FF] = *accumulator;
+                        //printf("Address: %0x \r\n", *PPUADDR);
                     }
                     (*PPUADDR)++;
                     (*registerX)--;
@@ -1100,7 +1854,9 @@ int gameMode_gameTypeMenu(int (*endFrame)(), int (*endFrameNoNMI)()) {
     disableNmi();
     bulkCopyToPpu(0xFD, 0x82E6, endFrameNoNMI);
     bulkCopyToPpu(0xFD, 0x82EB, endFrameNoNMI);
+    *accumulator = 0;
     changeCHRBank0();
+    *accumulator = 0;
     changeCHRBank1();
     waitForVBlankAndEnableNmi(endFrame);
     updateAudioWaitForNmiAndResetOamStaging(endFrame);
@@ -1189,7 +1945,9 @@ int gameMode_titleScreen(int (*endFrame)()) {
     *displayNextPiece = 0;
     updateAudioWaitForNmiAndDisablePpuRendering(endFrame);
     disableNmi();
+    *accumulator = 0;
     changeCHRBank0();
+    *accumulator = 0;
     changeCHRBank1();
     bulkCopyToPpu(0xFD, 0x826D, endFrame);
     bulkCopyToPpu(0xFD, 0x8272, endFrame);
@@ -1326,6 +2084,7 @@ int memset_ppu_page_and_more() {
     *currentPpuCtrl &= 0xFB;
     *PPUControlRegister = *currentPpuCtrl;
 
+    //printf("Adress: %i\r\n",(int)*accumulator);
     *PPUADDR = *accumulator << 8;
     *PPUADDR |= 0x00;
     *registerX = 4;
@@ -2285,10 +3044,14 @@ int setMMC1Control() {
 }
 int changeCHRBank0(){
     //can be ignored Mapper is hardcoded; mapping never changes
+    //broke somehow I now have to do something?
+    *CHRBank0 = *accumulator;
     return 24; // how long do writes to MMC1_Control take?
 }
 int changeCHRBank1() {
     //can be ignored Mapper is hardcoded; mapping never changes
+    //broke somehow I now have to do something?
+    *CHRBank1 = *accumulator;
     return 24; // how long do writes to MMC1_Control take?
 }
 int changePRGBank() {
@@ -3750,7 +4513,7 @@ int updatePaletteForLevel() {
     return clockcycles + 5;//last jump did not happen
 }
 
-/*int initPlayfieldIfTypeB(){
+int initPlayfieldIfTypeB(int(*endFrame)()){
     int clockcycles = 5;
     if(*gameType == 0){
         *accumulator = 0;
@@ -3776,7 +4539,7 @@ int updatePaletteForLevel() {
                     *generalCounter4 = rngTable[*registerY];
                     *registerX = *generalCounter2;
                     *registerY = multBy10Table[*registerX]+*generalCounter3;
-                    playField[*registerY] = *generalCounter4;
+                    playfield[*registerY] = *generalCounter4;
                     (*generalCounter3)--;
                 }while((int8_t)*generalCounter3 >= 0);
                 clockcycles += 1;//exiting the loop
@@ -3789,31 +4552,36 @@ int updatePaletteForLevel() {
                 *generalCounter5 = rng_seed[0] & 0x0F;
                 *registerX = *generalCounter2;
                 *registerY = multBy10Table[*registerX]+*generalCounter5;
-                playField[*registerY] = 0xEF;
-                //clockcycles += updateAudioWaitForNmiAndResetOamStaging(); // not yet implemented
-                generateNextPseudorandomNumber();//goes to next frame? Not part of the code !!
+                playfield[*registerY] = 0xEF;
+                clockcycles += updateAudioWaitForNmiAndResetOamStaging(endFrame); // not yet implemented
             }
         }
         for(int i=200;i>0;i--){//it starts with 200; offset 0 is not copied!
             clockcycles += 13;
-            playFieldForSecondPlayer[i] = playField[i];
+            playfieldForSecondPlayer[i] = playfield[i];
         }
+
         clockcycles += 10;
-        for(*registerY = typeBBlankInitCountByHeightTable[*player1_startHeight];(int8_t)*registerY>=0;(*registerY)--){
-            playField[*registerY]=0xEF;
+        for(*registerY = typeBBlankInitCountByHeightTable[*player1_startHeight]; *registerY > 0 ;(*registerY)--){
+            playfield[*registerY] = 0xEF;
             clockcycles += 11;
         }
+        playfield[*registerY] = 0xEF;
+        clockcycles += 11;
         clockcycles += -1;//last jump does not happen
         //below here the register have be set so they are correct after the return!
         clockcycles += 9;
         *registerX = *player2_startHeight;
-        for(*registerY = typeBBlankInitCountByHeightTable[*registerX];(int8_t)*registerY>=0;(*registerY)--){
-            playField[*registerY]=0xEF;
+        for(*registerY = typeBBlankInitCountByHeightTable[*registerX]; *registerY > 0;(*registerY)--){
+            playfieldForSecondPlayer[*registerY] = 0xEF;
             clockcycles += 11;
         }
+        playfieldForSecondPlayer[*registerY] = 0xEF;
+        clockcycles += 11;
         clockcycles += -1;//last jump does not happen
     }
-}*/
+    return clockcycles + 6;
+}
 
 int copyHighScoreLevelToNextIndex() {
     int clockcycles = 7;
@@ -4087,6 +4855,9 @@ int playState_lockTetrimino() {
         }
     }
     else {
+        end = clock();
+        //printf("Playing Movie took: %llu ms\r\n", (uint64_t)(end - start));
+        //print_playfield();
         *soundEffectSlot0Init = 2;
         *playState = 10;
         *curtainRow = 0xF0;
@@ -4485,6 +5256,7 @@ int shift_tetrimino() {
 
 int playState_updateLinesAndStatistics(){
     int clockcycles = 6;
+    //print_playfield();
     //completedlines is in the accumulator!
     clockcycles += updateMusicSpeed();
     *accumulator = *completedLines;
